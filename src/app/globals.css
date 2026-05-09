@@ -1,0 +1,301 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   Postplan — Design System
+   =============================================================================
+   Aesthetic: warm minimalism. Off-white paper-feel base, ink-violet primary,
+   refined typography. Inspired by Notion's warmth + Stripe's precision.
+
+   Color philosophy:
+   - Surface: warm off-white (#FBFAF9) — softer than pure white, closer to paper
+   - Ink: deep cool grey (#0F0F12) — not pure black, easier on eyes
+   - Primary: indigo-violet — confident but not party-purple
+   - Accents are restrained; typography and spacing carry the design.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* ---- Surface / Background ---- */
+    --background: 36 38% 98%;          /* #FBFAF9 — warm off-white paper */
+    --foreground: 240 10% 6%;          /* #0F0F12 — ink (cool dark) */
+
+    --surface-raised: 36 50% 99%;      /* card/popover slightly brighter than bg */
+    --surface-sunken: 36 25% 95%;      /* subtle "in" panels */
+
+    /* ---- Card ---- */
+    --card: 0 0% 100%;                 /* pure white inside cards for crispness */
+    --card-foreground: 240 10% 6%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 6%;
+
+    /* ---- Primary (ink-violet) ---- */
+    /* This is "indigo-700-ish" — confident, slightly cool. Not lavender. */
+    --primary: 245 65% 32%;            /* #2A2380 deep ink-violet */
+    --primary-foreground: 36 38% 98%;
+    --primary-soft: 245 70% 96%;       /* tinted bg for soft pills */
+    --primary-soft-foreground: 245 65% 32%;
+
+    /* ---- Secondary / Muted ---- */
+    --secondary: 36 25% 94%;           /* warm light grey */
+    --secondary-foreground: 240 10% 16%;
+
+    --muted: 36 20% 95%;
+    --muted-foreground: 240 5% 45%;    /* secondary text */
+
+    --accent: 36 30% 92%;              /* hover bg */
+    --accent-foreground: 240 10% 6%;
+
+    /* ---- Destructive ---- */
+    --destructive: 358 70% 50%;        /* refined red, not warning-cone red */
+    --destructive-foreground: 36 38% 98%;
+    --destructive-soft: 358 80% 96%;
+
+    /* ---- Success ---- */
+    --success: 158 50% 38%;            /* deep emerald */
+    --success-foreground: 36 38% 98%;
+    --success-soft: 158 55% 95%;
+
+    /* ---- Warning ---- */
+    --warning: 38 75% 48%;             /* honey amber, not neon */
+    --warning-foreground: 240 10% 6%;
+    --warning-soft: 38 85% 95%;
+
+    /* ---- Borders / Dividers ---- */
+    --border: 36 15% 88%;              /* warm hairline */
+    --border-strong: 36 12% 80%;
+    --input: 36 15% 88%;
+    --ring: 245 65% 32%;               /* primary, used as focus outline */
+
+    /* ---- Radii ---- */
+    --radius-sm: 0.375rem;             /* 6px — buttons, inputs */
+    --radius: 0.625rem;                /* 10px — cards */
+    --radius-lg: 0.875rem;             /* 14px — large surfaces */
+    --radius-full: 9999px;
+
+    /* ---- Shadows (Stripe-inspired layered) ---- */
+    --shadow-xs: 0 1px 2px 0 rgb(15 15 18 / 0.04);
+    --shadow-sm: 0 1px 3px 0 rgb(15 15 18 / 0.06), 0 1px 2px -1px rgb(15 15 18 / 0.04);
+    --shadow:    0 4px 12px -2px rgb(15 15 18 / 0.06), 0 2px 4px -2px rgb(15 15 18 / 0.04);
+    --shadow-lg: 0 12px 28px -4px rgb(15 15 18 / 0.08), 0 4px 8px -4px rgb(15 15 18 / 0.04);
+    --shadow-focus: 0 0 0 3px hsl(var(--primary) / 0.18);
+
+    /* ---- Animation ---- */
+    --duration-fast: 120ms;
+    --duration: 180ms;
+    --duration-slow: 280ms;
+    --ease: cubic-bezier(0.32, 0.72, 0, 1);  /* gentle spring-like */
+  }
+
+  .dark {
+    --background: 240 10% 6%;
+    --foreground: 36 30% 96%;
+
+    --surface-raised: 240 10% 10%;
+    --surface-sunken: 240 10% 4%;
+
+    --card: 240 10% 9%;
+    --card-foreground: 36 30% 96%;
+
+    --popover: 240 10% 10%;
+    --popover-foreground: 36 30% 96%;
+
+    --primary: 245 80% 72%;            /* lighter for contrast on dark */
+    --primary-foreground: 245 65% 16%;
+    --primary-soft: 245 30% 18%;
+    --primary-soft-foreground: 245 80% 80%;
+
+    --secondary: 240 8% 14%;
+    --secondary-foreground: 36 30% 92%;
+
+    --muted: 240 8% 13%;
+    --muted-foreground: 240 5% 60%;
+
+    --accent: 240 8% 16%;
+    --accent-foreground: 36 30% 96%;
+
+    --destructive: 358 75% 65%;
+    --destructive-foreground: 240 10% 6%;
+    --destructive-soft: 358 30% 18%;
+
+    --success: 158 60% 52%;
+    --success-foreground: 240 10% 6%;
+    --success-soft: 158 30% 16%;
+
+    --warning: 38 85% 60%;
+    --warning-foreground: 240 10% 6%;
+    --warning-soft: 38 30% 16%;
+
+    --border: 240 8% 18%;
+    --border-strong: 240 8% 24%;
+    --input: 240 8% 18%;
+    --ring: 245 80% 72%;
+
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.30);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25);
+    --shadow:    0 4px 12px -2px rgb(0 0 0 / 0.40), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 12px 28px -4px rgb(0 0 0 / 0.50), 0 4px 8px -4px rgb(0 0 0 / 0.30);
+    --shadow-focus: 0 0 0 3px hsl(var(--primary) / 0.30);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv11', 'ss01', 'ss03'; /* Geist alt forms */
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    /* Subtle warm grain — paper feeling without being kitschy.
+       Uses fractal noise from SVG. Disabled on dark theme to keep clean. */
+    background-image:
+      radial-gradient(at 0% 0%, hsl(var(--primary-soft) / 0.4), transparent 50%),
+      radial-gradient(at 100% 0%, hsl(38 70% 95%), transparent 50%);
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(at 0% 0%, hsl(var(--primary-soft) / 0.5), transparent 50%),
+      radial-gradient(at 100% 100%, hsl(245 30% 12%), transparent 60%);
+  }
+
+  /* Headings get tighter tracking and the display font weight */
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+
+  h1 { letter-spacing: -0.025em; }
+  h2 { letter-spacing: -0.022em; }
+  h3 { letter-spacing: -0.018em; }
+
+  /* Smooth focus ring for any focusable element using :focus-visible */
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+    border-radius: var(--radius-sm);
+  }
+
+  /* Selection: warm primary tint */
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+  }
+
+  /* Scrollbar — subtle, only on hover */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong));
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+    background-clip: padding-box;
+  }
+}
+
+@layer utilities {
+  /* Reusable transition presets */
+  .transition-base {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+    transition-timing-function: var(--ease);
+    transition-duration: var(--duration);
+  }
+  .transition-fast {
+    transition-duration: var(--duration-fast);
+  }
+
+  /* Card hover lift — used on plan cards, channel rows */
+  .hover-lift {
+    @apply transition-base;
+  }
+  .hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+  }
+
+  /* Soft pill — subtle tinted badge */
+  .pill-soft-primary {
+    background: hsl(var(--primary-soft));
+    color: hsl(var(--primary-soft-foreground));
+  }
+  .pill-soft-success {
+    background: hsl(var(--success-soft));
+    color: hsl(var(--success));
+  }
+  .pill-soft-warning {
+    background: hsl(var(--warning-soft));
+    color: hsl(var(--warning));
+  }
+  .pill-soft-destructive {
+    background: hsl(var(--destructive-soft));
+    color: hsl(var(--destructive));
+  }
+
+  /* Glassy backdrop for modals / popovers */
+  .glass {
+    background: hsl(var(--popover) / 0.85);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+  }
+
+  /* Inset card highlight (top edge subtle gradient) — Stripe touch */
+  .card-highlight {
+    position: relative;
+  }
+  .card-highlight::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      hsl(var(--foreground) / 0.06),
+      transparent
+    );
+    border-radius: var(--radius) var(--radius) 0 0;
+    pointer-events: none;
+  }
+
+  /* Page-load fade-up for hero sections */
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-up {
+    animation: fade-up var(--duration-slow) var(--ease) both;
+  }
+  .animate-fade-up-delay-1 { animation-delay: 60ms; }
+  .animate-fade-up-delay-2 { animation-delay: 120ms; }
+  .animate-fade-up-delay-3 { animation-delay: 180ms; }
+
+  /* Keyboard kbd-style monospace accent */
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 0.75em;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 0 hsl(var(--border-strong));
+  }
+}

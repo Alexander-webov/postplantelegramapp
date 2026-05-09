@@ -1,0 +1,58 @@
+# Dependencies — installed fresh in container
+node_modules
+
+# Build artefacts
+.next
+out
+dist
+build
+
+# Local environment files (never bake secrets into image)
+.env
+.env.local
+.env.production
+.env.development
+
+# Git & dev tooling
+.git
+.gitignore
+.github
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+coverage
+.nyc_output
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Documentation that doesn't need to be in the container
+README.md
+DEPLOY.md
+SCHEDULER.md
+BILLING.md
+ENV.md
+docs
+
+# Supabase migrations & functions — these run in Supabase Cloud, not in our container
+supabase/migrations
+supabase/functions
+supabase/email-templates
+
+# Tests
+__tests__
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Misc
+.husky
