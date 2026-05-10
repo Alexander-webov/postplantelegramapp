@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth/helpers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { TIERS } from '@/lib/tiers';
+import { TIERS, type SubscriptionTier } from '@/lib/tiers';
 import { LocalTimeLabel } from '@/components/dashboard/local-time-label';
 
 export const metadata = { title: 'Оплата' };
@@ -53,7 +53,7 @@ export default async function SuccessPage({ searchParams }: PageProps) {
               <div>
                 <CardTitle>Оплачено!</CardTitle>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Подписка <strong>{payment ? TIERS[payment.tier].name : ''}</strong> активирована
+                  Подписка <strong>{payment ? TIERS[payment.tier as SubscriptionTier].name : ''}</strong> активирована
                   {profile?.subscription_expires_at && (
                     <>
                       {' '}до{' '}
@@ -101,7 +101,7 @@ export default async function SuccessPage({ searchParams }: PageProps) {
             <div className="rounded-md border bg-muted/30 p-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Тариф</span>
-                <span className="font-medium">{TIERS[payment.tier].name}</span>
+                <span className="font-medium">{TIERS[payment.tier as SubscriptionTier].name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Сумма</span>

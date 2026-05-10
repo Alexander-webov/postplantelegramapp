@@ -54,7 +54,7 @@ export default async function BillingPage() {
               <p className="font-medium">Подписка истекла</p>
               <p className="text-sm text-muted-foreground">
                 Доступ к функциям тарифа{' '}
-                <strong>{TIERS[profile.subscription_tier ?? 'free'].name}</strong> закончился{' '}
+                <strong>{TIERS[(profile.subscription_tier ?? 'free') as SubscriptionTier].name}</strong> закончился{' '}
                 {profile.subscription_expires_at && (
                   <LocalTimeLabel utcIso={profile.subscription_expires_at} />
                 )}
@@ -175,7 +175,7 @@ export default async function BillingPage() {
                       <StatusIcon className={`h-4 w-4 shrink-0 ${statusColor}`} />
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-medium">
-                          {TIERS[p.tier]?.name ?? p.tier} · {p.amount_rub} ₽
+                          {TIERS[p.tier as SubscriptionTier]?.name ?? p.tier} · {p.amount_rub} ₽
                         </div>
                         <div className="text-xs text-muted-foreground">
                           <LocalTimeLabel utcIso={p.created_at} />
