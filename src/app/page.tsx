@@ -11,7 +11,7 @@ import { TIERS, formatLimit, isUnlimited, type SubscriptionTier } from '@/lib/ti
 export const metadata = {
   title: 'Постплан — один кабинет для всех твоих Telegram-каналов',
   description:
-    'Расписание постов до 3 месяцев, шаблоны, кросспостинг, медиа и подписи. Free навсегда, платный тариф от 149 ₽/мес.',
+    'Расписание постов до 3 месяцев, шаблоны, кросспостинг, медиа и подписи. Free навсегда, платный тариф от 299 ₽/мес.',
 };
 
 const TIER_ICONS: Record<SubscriptionTier, typeof Sparkles> = {
@@ -117,7 +117,7 @@ function Hero() {
           </div>
 
           <p className="mt-4 text-xs text-muted-foreground">
-            Без карты · Free навсегда · Платный тариф от 149 ₽/мес <span className="text-success">(−50% при запуске)</span>
+            Без карты · Free навсегда · Платный тариф от 299 ₽/мес
           </p>
         </div>
 
@@ -409,31 +409,14 @@ function Pricing() {
                 </div>
 
                 <div className="mt-3 space-y-1">
-                  {config.promoPriceRub !== null && config.priceRub > 0 ? (
-                    <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-semibold tracking-tight">
-                          {config.promoPriceRub}
-                        </span>
-                        <span className="text-sm text-muted-foreground">₽ / мес</span>
-                        <span className="text-sm text-muted-foreground line-through opacity-60">
-                          {config.priceRub} ₽
-                        </span>
-                      </div>
-                      <p className="text-xs text-success">
-                        −50% первые 3 месяца
-                      </p>
-                    </>
-                  ) : (
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-semibold tracking-tight">
-                        {config.priceRub === 0 ? '0' : config.priceRub}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        ₽{config.priceRub > 0 && ' / мес'}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-4xl font-semibold tracking-tight">
+                      {config.priceRub === 0 ? '0' : config.priceRub}
+                    </span>
+                    <span className="text-sm text-muted-foreground">
+                      ₽{config.priceRub > 0 && ' / мес'}
+                    </span>
+                  </div>
                 </div>
 
                 <ul className="mt-6 space-y-2.5 text-sm">
@@ -494,7 +477,7 @@ const faq = [
   },
   {
     q: 'Сколько каналов и постов на бесплатном тарифе?',
-    a: '1 канал и 10 постов в месяц. Этого хватит чтобы попробовать продукт целиком. Платный тариф «Базовый» сейчас 149 ₽/мес (−50% первые 3 месяца, потом 299 ₽) — 5 каналов и безлимит постов.',
+    a: '1 канал и 10 постов в месяц. Этого хватит чтобы попробовать продукт целиком. Платный тариф «Базовый» стоит 299 ₽/мес — 5 каналов и безлимит постов.',
   },
   {
     q: 'Постплан читает мои сообщения из канала?',
@@ -590,23 +573,46 @@ function PublicFooter() {
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <Logo />
-            <span className="text-xs text-muted-foreground">© 2026 Постплан</span>
+            <span className="text-xs text-muted-foreground">
+              © 2026 Постплан
+            </span>
           </div>
 
           <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground">Возможности</a>
-            <a href="#pricing" className="hover:text-foreground">Тарифы</a>
-            <a href="#faq" className="hover:text-foreground">Вопросы</a>
-            <Link href="/login" className="hover:text-foreground">Войти</Link>
-            <Link href="/signup" className="hover:text-foreground">Регистрация</Link>
+            <a href="#features" className="hover:text-foreground">
+              Возможности
+            </a>
+            <a href="#pricing" className="hover:text-foreground">
+              Тарифы
+            </a>
+            <a href="#faq" className="hover:text-foreground">
+              Вопросы
+            </a>
+            <Link href="/login" className="hover:text-foreground">
+              Войти
+            </Link>
+            <Link href="/signup" className="hover:text-foreground">
+              Регистрация
+            </Link>
           </nav>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-4 text-xs text-muted-foreground">
-          <Link href="/legal/privacy" className="hover:text-foreground">Конфиденциальность</Link>
-          <Link href="/legal/terms" className="hover:text-foreground">Условия использования</Link>
-          <Link href="/legal/offer" className="hover:text-foreground">Публичная оферта</Link>
-          <a href="mailto:hello@postplan.app" className="hover:text-foreground">hello@postplan.app</a>
+          <Link href="/legal/privacy" className="hover:text-foreground">
+            Конфиденциальность
+          </Link>
+          <Link href="/legal/terms" className="hover:text-foreground">
+            Условия использования
+          </Link>
+          <Link href="/legal/offer" className="hover:text-foreground">
+            Публичная оферта
+          </Link>
+          <a
+            href="mailto:hello@postplan-tg.ru"
+            className="hover:text-foreground"
+          >
+            hello@postplan-tg.ru
+          </a>
         </div>
       </div>
     </footer>

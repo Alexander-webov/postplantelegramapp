@@ -305,31 +305,14 @@ function PlanCard({
           <div className="font-semibold">{config.name}</div>
         </div>
         <div className="mt-3 space-y-0.5">
-          {config.promoPriceRub !== null && config.priceRub > 0 ? (
-            <>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-semibold tracking-tight">
-                  {config.promoPriceRub}
-                </span>
-                <span className="text-sm text-muted-foreground">₽ / мес</span>
-                <span className="text-sm text-muted-foreground line-through opacity-60">
-                  {config.priceRub} ₽
-                </span>
-              </div>
-              <p className="text-xs text-success">
-                −50% первые 3 месяца · потом {config.priceRub} ₽
-              </p>
-            </>
-          ) : (
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-semibold tracking-tight">
-                {config.priceRub === 0 ? '0' : config.priceRub}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                ₽{config.priceRub > 0 && ' / мес'}
-              </span>
-            </div>
-          )}
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-semibold tracking-tight">
+              {config.priceRub === 0 ? '0' : config.priceRub}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              ₽{config.priceRub > 0 && ' / мес'}
+            </span>
+          </div>
         </div>
       </div>
 

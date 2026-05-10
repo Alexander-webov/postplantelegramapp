@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: '%s · Постплан',
   },
   description:
-    'Управление Telegram-каналами из одного кабинета. Расписание постов до 3 месяцев, шаблоны, кросспостинг. От 149 ₽/мес (−50% при запуске).',
+    'Управление Telegram-каналами из одного кабинета. Расписание постов до 3 месяцев, шаблоны, кросспостинг. От 299 ₽/мес.',
   keywords: [
     'постплан',
     'планировщик постов telegram',
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   // OpenGraph tags help previews look polished when links are shared
   openGraph: {
     title: 'Постплан — планировщик постов для Telegram',
-    description: 'Расписание постов, шаблоны, кросспостинг, CRM рекламодателей. От 149 ₽/мес.',
+    description: 'Расписание постов, шаблоны, кросспостинг, CRM рекламодателей. От 299 ₽/мес.',
     locale: 'ru_RU',
     type: 'website',
     siteName: 'Постплан',

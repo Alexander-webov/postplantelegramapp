@@ -29,7 +29,7 @@ export default function SignupPage() {
           </li>
           <li className="flex items-start gap-2">
             <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
-            Платный тариф от 149 ₽/мес — −50% первые 3 месяца при запуске
+            Платный тариф от 299 ₽/мес — без скрытых комиссий
           </li>
         </ul>
 

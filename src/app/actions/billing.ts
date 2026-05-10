@@ -39,7 +39,7 @@ export async function createPaymentAction(
     return { error: 'Неверный тариф' };
   }
 
-  // Apply promo if user is within their first 3 months
+  // Charge the regular tariff price. Promo is disabled.
   const effective = getEffectivePrice(tier, profile.created_at);
   const chargeAmount = effective.priceRub;
 
@@ -66,9 +66,7 @@ export async function createPaymentAction(
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   const returnUrl = `${appUrl}/dashboard/billing/success?payment_id=${paymentRow.id}`;
-  const description = effective.isPromo
-    ? `Постплан · ${tierConfig.name} · 30 дней (промо −50%)`
-    : `Постплан · тариф ${tierConfig.name} · 30 дней`;
+  const description = `Постплан · тариф ${tierConfig.name} · 30 дней`;
 
   let yk;
   try {
@@ -83,7 +81,7 @@ export async function createPaymentAction(
         postplan_payment_id: paymentRow.id,
         postplan_user_id: user.id,
         postplan_tier: tier,
-        postplan_is_promo: effective.isPromo ? '1' : '0',
+        postplan_is_promo: '0',
       },
     });
   } catch (e) {
