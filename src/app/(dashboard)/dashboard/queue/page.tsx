@@ -59,7 +59,16 @@ function formatTimeUntil(targetIso: string): string {
   return remainingHrs > 0 ? `${days}д ${remainingHrs}ч` : `${days}д`;
 }
 
-export default async function QueuePage() {
+type QueuePageProps = {
+  searchParams?: { date?: string } | Promise<{ date?: string }>;
+};
+
+export default async function QueuePage({ searchParams }: QueuePageProps = {}) {
+  const resolvedSearchParams = await Promise.resolve(searchParams ?? {});
+  const selectedDate = typeof resolvedSearchParams.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(resolvedSearchParams.date)
+    ? resolvedSearchParams.date
+    : null;
+
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -83,7 +92,13 @@ export default async function QueuePage() {
     console.error('Queue page query failed:', queueErr);
   }
 
-  const queue = rows ?? [];
+  const allRows = rows ?? [];
+  const queue = selectedDate
+    ? allRows.filter((r) => {
+        const dateSource = r.scheduled_at ?? r.sent_at;
+        return dateSource ? toDateKey(new Date(dateSource)) === selectedDate : false;
+      })
+    : allRows;
   const pending = queue.filter((r) => r.status === 'pending' || r.status === 'processing');
   const history = queue.filter(
     (r) => r.status === 'sent' || r.status === 'failed' || r.status === 'cancelled'
@@ -92,8 +107,8 @@ export default async function QueuePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Очередь"
-        description="Запланированные посты, история отправок и редактирование уже опубликованного."
+        title={selectedDate ? `Очередь на ${formatDateHuman(selectedDate)}` : 'Очередь'}
+        description={selectedDate ? 'Публикации, запланированные на выбранную дату.' : 'Запланированные посты, история отправок и редактирование уже опубликованного.'}
         action={
           <Button asChild>
             <Link href="/dashboard/posts/new">
@@ -103,6 +118,12 @@ export default async function QueuePage() {
           </Button>
         }
       />
+
+      {selectedDate && (
+        <Button asChild variant="ghost" size="sm" className="-mt-2 w-fit">
+          <Link href="/dashboard/queue">Показать всю очередь</Link>
+        </Button>
+      )}
 
       {/* Pending section */}
       <section className="space-y-3">
@@ -371,4 +392,16 @@ export default async function QueuePage() {
       )}
     </div>
   );
+}
+
+function toDateKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatDateHuman(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 }

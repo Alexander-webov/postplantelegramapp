@@ -20,7 +20,7 @@ export const SECONDARY_NAV: NavItem[] = [
   { href: '/dashboard/channels', label: 'Каналы', icon: Radio },
   { href: '/dashboard/advertisers', label: 'Рекламодатели', icon: Briefcase },
   { href: '/dashboard/templates', label: 'Шаблоны', icon: FileText },
-  { href: '/dashboard/analytics', label: 'Аналитика', icon: BarChart3, comingSoon: true },
+  { href: '/dashboard/analytics', label: 'Аналитика', icon: BarChart3 },
 ];
 
 export const FOOTER_NAV: NavItem[] = [

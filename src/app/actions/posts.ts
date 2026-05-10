@@ -868,6 +868,19 @@ export async function refreshViewsAction(
     })
     .eq('id', scheduledId);
 
+  // Store an event-like snapshot as well. This powers the analytics page and
+  // keeps a history of manual refreshes. If the RLS insert policy has not been
+  // applied yet, the main scheduled_posts update above still succeeds.
+  await supabase
+    .from('post_analytics')
+    .insert({
+      scheduled_post_id: scheduledId,
+      views,
+      snapshot_at: refreshedAt,
+    });
+
   revalidatePath('/dashboard/queue');
+  revalidatePath(`/dashboard/queue/${scheduledId}/analytics`);
+  revalidatePath('/dashboard/analytics');
   return { views, refreshedAt };
 }

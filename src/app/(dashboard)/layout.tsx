@@ -1,18 +1,22 @@
 import { requireUser, getProfile } from '@/lib/auth/helpers';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { Header } from '@/components/dashboard/header';
+import { getEffectiveTier } from '@/lib/usage';
+import { TIERS } from '@/lib/tiers';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   await requireUser();
   const profile = await getProfile();
+  const tier = getEffectiveTier(profile);
+  const tierName = TIERS[tier]?.name ?? 'Free';
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex flex-1 flex-col">
+    <div className="min-h-screen bg-[#f7f8fc] text-foreground">
+      <Sidebar tierName={tierName} expiresAt={profile.subscription_expires_at} />
+      <div className="min-h-screen lg:pl-72">
         <Header email={profile.email} fullName={profile.full_name} />
-        <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+        <main className="px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+          <div className="mx-auto w-full max-w-[1280px]">{children}</div>
         </main>
       </div>
     </div>
