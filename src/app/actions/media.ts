@@ -1,13 +1,11 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { requireUser } from '@/lib/auth/helpers';
+import { getCurrentUser } from '@/lib/auth/helpers';
 import {
   classifyMime,
   maxBytesFor,
   humanSize,
-  TG_PHOTO_MAX_BYTES,
-  TG_VIDEO_MAX_BYTES,
 } from '@/lib/telegram/media';
 
 export type UploadResult =
@@ -34,11 +32,14 @@ const ALLOWED_MIMES = new Set([
 /**
  * Receives a single file from the composer and uploads it to Supabase Storage
  * under <user_id>/<random>.<ext>. Returns the storage path that the form will
- * later submit alongside the post text. RLS guarantees the user can only upload
- * into their own folder.
+ * later submit alongside the post text.
  */
 export async function uploadMediaAction(formData: FormData): Promise<UploadResult> {
-  const user = await requireUser();
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return { error: 'Сессия истекла. Войди заново и повтори загрузку.' };
+  }
 
   const file = formData.get('file');
   if (!(file instanceof File)) {
@@ -51,6 +52,7 @@ export async function uploadMediaAction(formData: FormData): Promise<UploadResul
       error: `Неподдерживаемый тип файла: ${file.type}. Разрешены: JPG, PNG, WebP, GIF, MP4, MOV, WebM`,
     };
   }
+
   const kind = classifyMime(file.type);
   if (!kind) return { error: 'Не удалось определить тип файла' };
 
@@ -70,23 +72,27 @@ export async function uploadMediaAction(formData: FormData): Promise<UploadResul
   const path = `${user.id}/${filename}`;
 
   const supabase = await createClient();
+
   const { error: uploadErr } = await supabase.storage
     .from('post-media')
     .upload(path, file, {
       contentType: file.type,
       upsert: false,
     });
+
   if (uploadErr) {
     return { error: `Не удалось загрузить: ${uploadErr.message}` };
   }
 
   // Generate a short-lived signed URL for the preview thumbnail in the composer.
-  // The form just needs to display the file the user just picked.
   let preview_url: string | null = null;
-  const { data: signed } = await supabase.storage
+  const { data: signed, error: signedErr } = await supabase.storage
     .from('post-media')
-    .createSignedUrl(path, 60 * 60); // 1 hour
-  preview_url = signed?.signedUrl ?? null;
+    .createSignedUrl(path, 60 * 60);
+
+  if (!signedErr) {
+    preview_url = signed?.signedUrl ?? null;
+  }
 
   return {
     path,
@@ -100,13 +106,18 @@ export async function uploadMediaAction(formData: FormData): Promise<UploadResul
 
 /**
  * Removes a single uploaded file from Storage. Used when the user clicks the
- * "remove" X on a thumbnail before sending the post. RLS scopes by user_id
- * folder, so users can only delete their own files.
+ * "remove" X on a thumbnail before sending the post.
  */
 export async function deleteMediaAction(formData: FormData): Promise<{ error?: string; success?: boolean }> {
-  await requireUser();
+  const user = await getCurrentUser();
+  if (!user) return { error: 'Сессия истекла' };
+
   const path = formData.get('path');
   if (typeof path !== 'string' || !path) return { error: 'Путь не указан' };
+
+  if (!path.startsWith(`${user.id}/`)) {
+    return { error: 'Нельзя удалить чужой файл' };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.storage.from('post-media').remove([path]);
