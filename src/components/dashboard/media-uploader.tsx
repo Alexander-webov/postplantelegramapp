@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState, useRef, useTransition } from 'react';
 import { toast } from 'sonner';
 import { Image as ImageIcon, Video as VideoIcon, X, Upload, FileWarning } from 'lucide-react';
 import { uploadMediaAction, deleteMediaAction } from '@/app/actions/media';
@@ -29,27 +29,9 @@ function humanSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function isUploadError(result: unknown): result is { error: string } {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'error' in result &&
-    typeof (result as { error?: unknown }).error === 'string'
-  );
-}
-
-function isUploadedMedia(result: unknown): result is UploadedMedia {
-  return (
-    typeof result === 'object' &&
-    result !== null &&
-    'path' in result &&
-    typeof (result as { path?: unknown }).path === 'string'
-  );
-}
-
 export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [pending, startTransition] = useTransition();
   const [dragActive, setDragActive] = useState(false);
 
   // Album rule preview: animation alone in album is invalid
@@ -60,74 +42,52 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
       : null;
 
   function pickFiles() {
-    if (!isUploading) inputRef.current?.click();
+    inputRef.current?.click();
   }
 
-  async function uploadOne(file: File): Promise<UploadedMedia | null> {
-    try {
-      const fd = new FormData();
-      fd.append('file', file);
-
-      const result = await uploadMediaAction(fd);
-
-      if (isUploadError(result)) {
-        toast.error(`${file.name}: ${result.error}`);
-        return null;
-      }
-
-      if (!isUploadedMedia(result)) {
-        toast.error(`${file.name}: загрузка не вернула данные файла`);
-        return null;
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Media upload failed:', error);
-      toast.error(
-        `${file.name}: ${error instanceof Error ? error.message : 'ошибка загрузки файла'}`,
-      );
+  async function uploadOne(file: File) {
+    const fd = new FormData();
+    fd.append('file', file);
+    const result = await uploadMediaAction(fd);
+    if ('error' in result) {
+      toast.error(`${file.name}: ${result.error}`);
       return null;
     }
+    return result;
   }
 
-  async function handleFiles(files: FileList | File[]) {
+  function handleFiles(files: FileList | File[]) {
     const arr = Array.from(files);
-    if (arr.length === 0 || isUploading) return;
+    if (arr.length === 0) return;
 
     const remaining = maxItems - value.length;
     if (remaining <= 0) {
       toast.error(`Максимум ${maxItems} файлов`);
       return;
     }
-
     const toUpload = arr.slice(0, remaining);
     if (arr.length > remaining) {
       toast.warning(`Загружу только ${remaining} из ${arr.length} (лимит ${maxItems})`);
     }
 
-    setIsUploading(true);
-
-    try {
+    startTransition(async () => {
       const uploaded: UploadedMedia[] = [];
       for (const f of toUpload) {
         const r = await uploadOne(f);
         if (r) uploaded.push(r);
       }
-
       if (uploaded.length > 0) {
         onChange([...value, ...uploaded]);
-        toast.success(uploaded.length === 1 ? 'Файл загружен' : `Загружено: ${uploaded.length}`);
+        toast.success(
+          uploaded.length === 1 ? 'Файл загружен' : `Загружено: ${uploaded.length}`
+        );
       }
-    } finally {
-      setIsUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
+    });
   }
 
   function removeAt(index: number) {
     const item = value[index];
     if (!item) return;
-
     // Optimistic UI removal; storage cleanup is best-effort
     const next = value.filter((_, i) => i !== index);
     onChange(next);
@@ -136,13 +96,14 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
     fd.append('path', item.path);
     deleteMediaAction(fd).catch(() => {
       // Non-fatal — orphan files in storage will be cleaned up later
+      // (we'll add a retention job in the future)
     });
   }
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragActive(false);
-    if (e.dataTransfer.files?.length) void handleFiles(e.dataTransfer.files);
+    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
   }
 
   return (
@@ -159,12 +120,12 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
           dragActive
             ? 'border-primary bg-primary/5'
             : 'border-border hover:border-primary/50 hover:bg-accent/30'
-        } ${isUploading ? 'pointer-events-none opacity-60' : ''}`}
+        } ${pending ? 'pointer-events-none opacity-60' : ''}`}
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
         <div className="text-sm">
           <span className="font-medium">
-            {isUploading ? 'Загружаю…' : 'Перетащи файлы сюда'}
+            {pending ? 'Загружаю…' : 'Перетащи файлы сюда'}
           </span>{' '}
           <span className="text-muted-foreground">или нажми чтобы выбрать</span>
         </div>
@@ -178,7 +139,9 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
           accept={ACCEPT}
           className="hidden"
           onChange={(e) => {
-            if (e.target.files) void handleFiles(e.target.files);
+            if (e.target.files) handleFiles(e.target.files);
+            // reset so the same file can be re-selected after removal
+            e.target.value = '';
           }}
         />
       </div>
