@@ -45,15 +45,33 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
     inputRef.current?.click();
   }
 
-  async function uploadOne(file: File) {
+  async function uploadOne(file: File): Promise<UploadedMedia | null> {
     const fd = new FormData();
     fd.append('file', file);
-    const result = await uploadMediaAction(fd);
-    if ('error' in result) {
-      toast.error(`${file.name}: ${result.error}`);
+
+    try {
+      const result = await uploadMediaAction(fd);
+
+      // Server Actions may return undefined if the request is rejected,
+      // the session is missing, or a redirect/exception happens before
+      // the action returns a typed payload. Never use "in" before
+      // checking that result is actually an object.
+      if (!result || typeof result !== 'object') {
+        toast.error(`${file.name}: не удалось загрузить файл. Обнови страницу и попробуй снова.`);
+        return null;
+      }
+
+      if ('error' in result) {
+        toast.error(`${file.name}: ${result.error}`);
+        return null;
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Media upload failed:', error);
+      toast.error(`${file.name}: ошибка загрузки. Обнови страницу и попробуй снова.`);
       return null;
     }
-    return result;
   }
 
   function handleFiles(files: FileList | File[]) {
