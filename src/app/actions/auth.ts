@@ -7,7 +7,16 @@ import { createClient } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth/helpers';
 import { signupSchema, loginSchema } from '@/lib/validations/schemas';
 
-export type ActionResult = { error?: string; success?: boolean; message?: string };
+export type ActionResult = {
+  error?: string;
+  success?: boolean;
+  message?: string;
+  needsEmailConfirmation?: boolean;
+};
+
+function getAppUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+}
 
 export async function signupAction(formData: FormData): Promise<ActionResult> {
   const parsed = signupSchema.safeParse({
@@ -15,24 +24,38 @@ export async function signupAction(formData: FormData): Promise<ActionResult> {
     password: formData.get('password'),
     full_name: formData.get('full_name') || undefined,
   });
+
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Ошибка валидации' };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.full_name },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      emailRedirectTo: `${getAppUrl()}/auth/callback?next=/dashboard`,
     },
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    return { error: error.message };
+  }
 
-  revalidatePath('/', 'layout');
-  redirect('/dashboard');
+  // If email confirmation is disabled, Supabase returns a session immediately.
+  // If confirmation is enabled, session is null and the user must confirm email first.
+  if (data.session) {
+    revalidatePath('/', 'layout');
+    redirect('/dashboard');
+  }
+
+  return {
+    success: true,
+    needsEmailConfirmation: true,
+    message: 'Аккаунт создан. Мы отправили письмо для подтверждения email. Проверь входящие и папку «Спам».',
+  };
 }
 
 export async function loginAction(formData: FormData): Promise<ActionResult> {
@@ -40,13 +63,25 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
     email: formData.get('email'),
     password: formData.get('password'),
   });
+
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Ошибка валидации' };
   }
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error) return { error: 'Неверный email или пароль' };
+
+  if (error) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes('email not confirmed') || message.includes('confirm')) {
+      return {
+        error: 'Email ещё не подтверждён. Проверь почту и перейди по ссылке подтверждения.',
+      };
+    }
+
+    return { error: 'Неверный email или пароль' };
+  }
 
   revalidatePath('/', 'layout');
   redirect('/dashboard');
@@ -82,7 +117,7 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/reset-password`,
+    redirectTo: `${getAppUrl()}/auth/reset-password`,
   });
 
   // Don't leak whether the address was real

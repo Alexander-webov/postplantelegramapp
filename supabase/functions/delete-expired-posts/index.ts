@@ -1,25 +1,16 @@
 // =============================================================================
 // Postplan — delete-expired-posts Edge Function
 // =============================================================================
-// Triggered every minute by cron-job.org. Picks rows in scheduled_posts where:
-//   - status = 'sent'
-//   - auto_delete_at IS NOT NULL AND auto_delete_at <= now()
-//   - auto_deleted_at IS NULL
-//   - auto_delete_error IS NULL
-// For each, deletes the message(s) from Telegram via deleteMessage API.
+// Deletes Telegram messages whose auto_delete_at is due.
 //
-// Authorization model:
-//   - We do NOT check Authorization header in code — it's unreliable in
-//     edge runtime (env var name conflicts with system reserved names).
-//   - Instead, security is enforced by Supabase Gateway via the
-//     "Verify JWT with legacy secret" toggle in function Settings:
-//       * If ON: Supabase requires Authorization: Bearer <anon_or_service_role>
-//                BEFORE the request reaches our code
-//       * If OFF: function is publicly callable. Use this for cron pings.
-//   - Both modes are fine for this function — pick based on your threat model.
+// Required secrets:
+//   ENCRYPTION_KEY
+// Optional custom secrets, if built-in SUPABASE_* are unavailable:
+//   POSTPLAN_SUPABASE_URL
+//   POSTPLAN_SERVICE_ROLE_KEY
 //
-// Re-deploy after editing:
-//   Dashboard → Edge Functions → delete-expired-posts → paste this file
+// Deploy:
+//   supabase functions deploy delete-expired-posts --no-verify-jwt
 // =============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.1';
@@ -27,47 +18,75 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.1';
 const BATCH_SIZE = 30;
 const TG_API = 'https://api.telegram.org';
 
+type BotRef = { token_encrypted: string | null };
+type ChannelRef = {
+  title: string | null;
+  telegram_chat_id: string | null;
+  bots: BotRef | BotRef[] | null;
+};
+
 interface ExpiredRow {
   id: string;
   user_id: string;
   telegram_message_id: number | null;
   telegram_message_ids: number[] | null;
-  channels: {
-    title: string;
-    telegram_chat_id: string;
-    bots: { token_encrypted: string } | null;
-  } | null;
+  channels: ChannelRef | ChannelRef[] | null;
 }
 
-// ---- AES-256-GCM decryption (mirror of src/lib/crypto.ts) ----------------
-async function decryptToken(encrypted: string): Promise<string> {
+function getSupabaseEnv() {
+  const supabaseUrl =
+    Deno.env.get('SUPABASE_URL') ?? Deno.env.get('POSTPLAN_SUPABASE_URL');
+  const serviceKey =
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('POSTPLAN_SERVICE_ROLE_KEY');
+  return { supabaseUrl, serviceKey };
+}
+
+function pickOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+// AES-256-GCM decryption — exact mirror of src/lib/crypto.ts:
+// base64(iv[12] | authTag[16] | ciphertext)
+async function decryptToken(payload: string): Promise<string> {
   const keyB64 = Deno.env.get('ENCRYPTION_KEY');
   if (!keyB64) throw new Error('ENCRYPTION_KEY env var missing');
 
-  const buf = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
-  const iv = buf.slice(0, 12);
-  const ciphertext = buf.slice(12);
-
   const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
+  if (keyBytes.length !== 32) {
+    throw new Error('ENCRYPTION_KEY must decode to exactly 32 bytes');
+  }
+
+  const data = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+  const iv = data.slice(0, 12);
+  const authTag = data.slice(12, 28);
+  const ciphertext = data.slice(28);
+
+  const ctWithTag = new Uint8Array(ciphertext.length + authTag.length);
+  ctWithTag.set(ciphertext, 0);
+  ctWithTag.set(authTag, ciphertext.length);
+
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
     keyBytes,
     { name: 'AES-GCM' },
     false,
-    ['decrypt']
+    ['decrypt'],
   );
+
   const decrypted = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv },
     cryptoKey,
-    ciphertext
+    ctWithTag,
   );
+
   return new TextDecoder().decode(decrypted);
 }
 
 async function tgDelete(
   token: string,
   chatId: string,
-  messageId: number
+  messageId: number,
 ): Promise<{ ok: boolean; description?: string }> {
   const res = await fetch(`${TG_API}/bot${token}/deleteMessage`, {
     method: 'POST',
@@ -80,30 +99,28 @@ async function tgDelete(
 
 Deno.serve(async (_req) => {
   const startedAt = Date.now();
-
-  // Supabase Edge Functions inject SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
-  // automatically — we use those, not custom secrets. ENCRYPTION_KEY is OUR
-  // custom secret that we set up in Project Settings → Edge Function Secrets.
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const { supabaseUrl, serviceKey } = getSupabaseEnv();
 
   if (!supabaseUrl || !serviceKey) {
     return new Response(
-      JSON.stringify({ error: 'Server misconfiguration: missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        ok: false,
+        error: 'Missing Supabase URL or service role key',
+        hint: 'Use built-in SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY or custom POSTPLAN_SUPABASE_URL/POSTPLAN_SERVICE_ROLE_KEY',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
     );
   }
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  // Pick due rows
   const { data: rows, error: selectErr } = await supabase
     .from('scheduled_posts')
     .select(
       `
       id, user_id, telegram_message_id, telegram_message_ids,
       channels (title, telegram_chat_id, bots (token_encrypted))
-      `
+      `,
     )
     .eq('status', 'sent')
     .not('auto_delete_at', 'is', null)
@@ -113,39 +130,34 @@ Deno.serve(async (_req) => {
     .limit(BATCH_SIZE);
 
   if (selectErr) {
-    console.error('Select failed:', selectErr);
-    return new Response(JSON.stringify({ error: selectErr.message }), {
+    return new Response(JSON.stringify({ ok: false, error: selectErr.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
   const expired = (rows ?? []) as unknown as ExpiredRow[];
+
   if (expired.length === 0) {
     return new Response(
-      JSON.stringify({ ok: true, processed: 0, ms: Date.now() - startedAt }),
-      { headers: { 'Content-Type': 'application/json' } }
+      JSON.stringify({ ok: true, processed: 0, deleted: 0, failed: 0, reason: 'No due posts', ms: Date.now() - startedAt }),
+      { headers: { 'Content-Type': 'application/json' } },
     );
   }
 
   let deleted = 0;
   let failed = 0;
+  const errors: Array<{ scheduled_post_id: string; error: string }> = [];
 
   for (const row of expired) {
-    const channel = Array.isArray(row.channels) ? row.channels[0] : row.channels;
-    const bot = channel?.bots
-      ? Array.isArray(channel.bots) ? channel.bots[0] : channel.bots
-      : null;
+    const channel = pickOne(row.channels);
+    const bot = pickOne(channel?.bots);
 
-    if (!channel || !bot?.token_encrypted) {
-      // Channel/bot deleted — mark as failed so we don't retry forever
-      await supabase
-        .from('scheduled_posts')
-        .update({
-          auto_delete_error: 'Канал или бот удалён — нечем удалять',
-        })
-        .eq('id', row.id);
+    if (!channel?.telegram_chat_id || !bot?.token_encrypted) {
+      const error = 'Канал, chat_id или бот отсутствуют';
+      await supabase.from('scheduled_posts').update({ auto_delete_error: error }).eq('id', row.id);
       failed++;
+      errors.push({ scheduled_post_id: row.id, error });
       continue;
     }
 
@@ -153,65 +165,55 @@ Deno.serve(async (_req) => {
     try {
       token = await decryptToken(bot.token_encrypted);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'decrypt failed';
-      await supabase
-        .from('scheduled_posts')
-        .update({ auto_delete_error: `Ошибка расшифровки токена: ${msg}` })
-        .eq('id', row.id);
+      const error = `Ошибка расшифровки токена: ${e instanceof Error ? e.message : 'decrypt failed'}`;
+      await supabase.from('scheduled_posts').update({ auto_delete_error: error }).eq('id', row.id);
       failed++;
+      errors.push({ scheduled_post_id: row.id, error });
       continue;
     }
 
-    // Determine the list of message ids to delete. Prefer the array (set for
-    // posts created after migration 006), fall back to the singular id.
     const ids =
       row.telegram_message_ids && row.telegram_message_ids.length > 0
         ? row.telegram_message_ids
         : row.telegram_message_id !== null
-        ? [row.telegram_message_id]
-        : [];
+          ? [row.telegram_message_id]
+          : [];
 
     if (ids.length === 0) {
-      await supabase
-        .from('scheduled_posts')
-        .update({ auto_delete_error: 'Нет id сообщения для удаления' })
-        .eq('id', row.id);
+      const error = 'Нет id сообщения для удаления';
+      await supabase.from('scheduled_posts').update({ auto_delete_error: error }).eq('id', row.id);
       failed++;
+      errors.push({ scheduled_post_id: row.id, error });
       continue;
     }
 
-    // Delete each message — in albums each photo is a separate message.
-    const errors: string[] = [];
+    const deleteErrors: string[] = [];
+
     for (const messageId of ids) {
       const r = await tgDelete(token, channel.telegram_chat_id, messageId);
       if (!r.ok) {
-        // Common reasons: "message can't be deleted" (>48h, no admin rights),
-        // "message to delete not found" (already deleted manually).
-        // Treat "not found" as soft-success — message already gone.
-        if (r.description?.includes('not found')) {
-          // already deleted by the user — proceed silently
-        } else {
-          errors.push(`msg ${messageId}: ${r.description ?? 'unknown'}`);
+        const desc = r.description ?? 'unknown Telegram error';
+        if (!desc.toLowerCase().includes('not found')) {
+          deleteErrors.push(`msg ${messageId}: ${desc}`);
         }
       }
-      // Pacing — Telegram tolerates many deletes, but be polite
       await new Promise((res) => setTimeout(res, 80));
     }
 
     const now = new Date().toISOString();
-    if (errors.length > 0) {
+
+    if (deleteErrors.length > 0) {
+      const error = deleteErrors.join('; ').slice(0, 500);
       await supabase
         .from('scheduled_posts')
-        .update({
-          auto_delete_error: errors.join('; ').slice(0, 500),
-          auto_deleted_at: now, // mark attempted so we don't retry forever
-        })
+        .update({ auto_delete_error: error, auto_deleted_at: now })
         .eq('id', row.id);
       failed++;
+      errors.push({ scheduled_post_id: row.id, error });
     } else {
       await supabase
         .from('scheduled_posts')
-        .update({ auto_deleted_at: now })
+        .update({ auto_deleted_at: now, auto_delete_error: null })
         .eq('id', row.id);
       deleted++;
     }
@@ -223,8 +225,9 @@ Deno.serve(async (_req) => {
       processed: expired.length,
       deleted,
       failed,
+      errors: errors.slice(0, 10),
       ms: Date.now() - startedAt,
     }),
-    { headers: { 'Content-Type': 'application/json' } }
+    { headers: { 'Content-Type': 'application/json' } },
   );
 });

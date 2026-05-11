@@ -18,8 +18,13 @@ export function LoginForm() {
       action={(formData) =>
         startTransition(async () => {
           setError(null);
+
           const result = await loginAction(formData);
-          if (result?.error) {
+
+          // Server actions that redirect may resolve as undefined on the client.
+          if (!result) return;
+
+          if (result.error) {
             setError(result.error);
             toast.error(result.error);
           }

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from "next/link";
 import {
   ArrowRight,
   CalendarDays,
@@ -12,22 +12,26 @@ import {
   Users,
   Zap,
   AlertCircle,
-} from 'lucide-react';
-import { createClient } from '@/lib/supabase/server';
-import { requireUser, getProfile } from '@/lib/auth/helpers';
-import { getEffectiveTier, isSubscriptionExpired, getUsage } from '@/lib/usage';
-import { TIERS, isUnlimited } from '@/lib/tiers';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { LocalTimeLabel } from '@/components/dashboard/local-time-label';
-import { ActivationChecklist } from '@/components/dashboard/activation-checklist';
-import { ScheduledPostActions } from '@/components/dashboard/scheduled-post-actions';
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { requireUser, getProfile } from "@/lib/auth/helpers";
+import { getEffectiveTier, isSubscriptionExpired, getUsage } from "@/lib/usage";
+import { TIERS, isUnlimited } from "@/lib/tiers";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { LocalTimeLabel } from "@/components/dashboard/local-time-label";
+import { ActivationChecklist } from "@/components/dashboard/activation-checklist";
+import { ScheduledPostActions } from "@/components/dashboard/scheduled-post-actions";
 
-export const metadata = { title: 'Обзор' };
+export const metadata = { title: "Обзор" };
 
 type PostContent = { content: string | null };
-type ChannelData = { id: string; title: string | null; username?: string | null };
+type ChannelData = {
+  id: string;
+  title: string | null;
+  username?: string | null;
+};
 
 type RecentRow = {
   id: string;
@@ -77,45 +81,49 @@ export default async function DashboardPage() {
     { count: advertisersCount },
   ] = await Promise.all([
     supabase
-      .from('scheduled_posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('status', 'pending'),
+      .from("scheduled_posts")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "pending"),
     supabase
-      .from('scheduled_posts')
-      .select('id, status, scheduled_at, sent_at, views_latest, posts(content), channels(id, title, username)')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .from("scheduled_posts")
+      .select(
+        "id, status, scheduled_at, sent_at, views_latest, posts(content), channels(id, title, username)",
+      )
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
       .limit(8),
     supabase
-      .from('scheduled_posts')
-      .select('id, status, scheduled_at, posts(content), channels(id, title, username)')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'processing'])
-      .gte('scheduled_at', todayStart.toISOString())
-      .lte('scheduled_at', nextMonth.toISOString())
-      .order('scheduled_at', { ascending: true })
+      .from("scheduled_posts")
+      .select(
+        "id, status, scheduled_at, posts(content), channels(id, title, username)",
+      )
+      .eq("user_id", user.id)
+      .in("status", ["pending", "processing"])
+      .gte("scheduled_at", todayStart.toISOString())
+      .lte("scheduled_at", nextMonth.toISOString())
+      .order("scheduled_at", { ascending: true })
       .limit(50),
     supabase
-      .from('channels')
-      .select('id, title, username, is_active')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .from("channels")
+      .select("id, title, username, is_active")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
       .limit(5),
     supabase
-      .from('scheduled_posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('status', 'sent'),
+      .from("scheduled_posts")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "sent"),
     supabase
-      .from('templates')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id),
+      .from("templates")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id),
     supabase
-      .from('advertisers')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .is('archived_at', null),
+      .from("advertisers")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .is("archived_at", null),
   ]);
 
   const recent = (recentRes.data ?? []) as RecentRow[];
@@ -125,7 +133,8 @@ export default async function DashboardPage() {
   const hasPostedAtLeastOnce = (sentCount ?? 0) > 0;
   const hasTemplates = (templatesCount ?? 0) > 0;
   const hasFirstAdvertiser = (advertisersCount ?? 0) > 0;
-  const allOnboardingDone = hasChannels && hasPostedAtLeastOnce && hasTemplates && hasFirstAdvertiser;
+  const allOnboardingDone =
+    hasChannels && hasPostedAtLeastOnce && hasTemplates && hasFirstAdvertiser;
   const firstName = (profile.full_name ?? profile.email).split(/\s|@/)[0];
 
   return (
@@ -138,12 +147,14 @@ export default async function DashboardPage() {
               {greetingByHour()}
             </div>
             <h1 className="text-3xl font-semibold tracking-[-0.04em] text-slate-950 md:text-4xl">
-              {hasChannels ? `Привет, ${firstName}` : `С приходом, ${firstName}`}
+              {hasChannels
+                ? `Привет, ${firstName}`
+                : `С приходом, ${firstName}`}
             </h1>
             <p className="max-w-2xl text-sm text-slate-500 md:text-base">
               {hasChannels
-                ? 'Единый центр управления Telegram-публикациями, каналами и рекламными размещениями.'
-                : 'Подключи первый канал — дальше Постплан сам покажет очередь, статусы и ближайшие публикации.'}
+                ? "Единый центр управления Telegram-публикациями, каналами и рекламными размещениями."
+                : "Подключи первый канал — дальше Постплан сам покажет очередь, статусы и ближайшие публикации."}
             </p>
           </div>
 
@@ -154,7 +165,12 @@ export default async function DashboardPage() {
                 Создать пост
               </Link>
             </Button>
-            <Button asChild size="lg" variant="outline" className="rounded-xl bg-white/70">
+            <Button
+              asChild
+              size="lg"
+              variant="outline"
+              className="rounded-xl bg-white/70"
+            >
               <Link href="/dashboard/channels">
                 <Radio className="h-4 w-4" />
                 Каналы
@@ -175,7 +191,7 @@ export default async function DashboardPage() {
         />
       )}
 
-      {!expired && tier === 'free' && (
+      {!expired && tier === "free" && (
         <SubscriptionBanner
           tone="primary"
           icon={Sparkles}
@@ -232,10 +248,19 @@ export default async function DashboardPage() {
             <Card className="overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-[0_22px_60px_-48px_rgba(15,23,42,0.9)]">
               <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
                 <div>
-                  <h2 className="text-lg font-semibold tracking-tight">Запланированные посты</h2>
-                  <p className="text-sm text-slate-500">Последние публикации и очередь отправки</p>
+                  <h2 className="text-lg font-semibold tracking-tight">
+                    Запланированные посты
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    Последние публикации и очередь отправки
+                  </p>
                 </div>
-                <Button asChild size="sm" variant="outline" className="rounded-xl bg-white">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl bg-white"
+                >
                   <Link href="/dashboard/queue">
                     Все посты
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -251,7 +276,8 @@ export default async function DashboardPage() {
                     </div>
                     <h3 className="mt-4 font-semibold">Очередь пока пустая</h3>
                     <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
-                      Создай первый пост — здесь появятся время публикации, канал, статус и метрики.
+                      Создай первый пост — здесь появятся время публикации,
+                      канал, статус и метрики.
                     </p>
                     <Button asChild className="mt-5 rounded-xl">
                       <Link href="/dashboard/posts/new">Создать пост</Link>
@@ -275,7 +301,10 @@ export default async function DashboardPage() {
             </Card>
 
             <div className="space-y-5">
-              <CalendarCard upcoming={upcoming} scheduledCount={scheduledCount ?? 0} />
+              <CalendarCard
+                upcoming={upcoming}
+                scheduledCount={scheduledCount ?? 0}
+              />
               <ChannelsCard channels={channels} />
             </div>
           </div>
@@ -289,17 +318,29 @@ function PostRow({ row }: { row: RecentRow }) {
   const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
   const channel = Array.isArray(row.channels) ? row.channels[0] : row.channels;
   const when = row.sent_at ?? row.scheduled_at;
-  const preview = post?.content?.trim() || '(без текста)';
-  const viewsLabel = typeof row.views_latest === 'number' ? row.views_latest.toLocaleString('ru-RU') : '—';
+  const preview = post?.content?.trim() || "(без текста)";
+  const viewsLabel =
+    typeof row.views_latest === "number"
+      ? row.views_latest.toLocaleString("ru-RU")
+      : "—";
 
   return (
     <div className="grid gap-3 px-5 py-4 transition-base hover:bg-slate-50/80 lg:grid-cols-[minmax(0,1.35fr)_minmax(145px,0.75fr)_118px_120px_120px] lg:items-center lg:gap-4 lg:px-6">
-      <Link href={row.status === 'sent' ? `/dashboard/queue/${row.id}/analytics` : `/dashboard/queue/${row.id}/edit`} className="flex min-w-0 items-start gap-3 rounded-xl transition-base hover:text-primary">
+      <Link
+        href={
+          row.status === "sent"
+            ? `/dashboard/queue/${row.id}/analytics`
+            : `/dashboard/queue/${row.id}/edit`
+        }
+        className="flex min-w-0 items-start gap-3 rounded-xl transition-base hover:text-primary"
+      >
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-sky-100 to-indigo-100 text-primary">
           <FileText className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <div className="line-clamp-2 text-sm font-semibold text-slate-950">{preview}</div>
+          <div className="line-clamp-2 text-sm font-semibold text-slate-950">
+            {preview}
+          </div>
           <div className="mt-1 text-xs text-slate-400">Telegram-публикация</div>
         </div>
       </Link>
@@ -309,8 +350,14 @@ function PostRow({ row }: { row: RecentRow }) {
           <Send className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0">
-          <div className="truncate font-medium text-slate-800">{channel?.title ?? '—'}</div>
-          {channel?.username && <div className="truncate text-xs text-slate-400">@{channel.username}</div>}
+          <div className="truncate font-medium text-slate-800">
+            {channel?.title ?? "—"}
+          </div>
+          {channel?.username && (
+            <div className="truncate text-xs text-slate-400">
+              @{channel.username}
+            </div>
+          )}
         </div>
       </div>
 
@@ -319,25 +366,30 @@ function PostRow({ row }: { row: RecentRow }) {
       </div>
 
       <div className="text-sm text-slate-700">
-        {when ? <LocalTimeLabel utcIso={when} /> : '—'}
+        {when ? <LocalTimeLabel utcIso={when} /> : "—"}
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5 text-sm text-slate-500" title="Последний замер просмотров">
-          <Eye className="h-3.5 w-3.5" />
-          <span className="tabular-nums">{viewsLabel}</span>
-        </div>
         <ScheduledPostActions id={row.id} status={row.status} />
       </div>
     </div>
   );
 }
 
-function CalendarCard({ upcoming, scheduledCount }: { upcoming: UpcomingRow[]; scheduledCount: number }) {
+function CalendarCard({
+  upcoming,
+  scheduledCount,
+}: {
+  upcoming: UpcomingRow[];
+  scheduledCount: number;
+}) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth();
-  const monthLabel = today.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+  const monthLabel = today.toLocaleDateString("ru-RU", {
+    month: "long",
+    year: "numeric",
+  });
   const first = new Date(year, month, 1);
   const firstWeekdayMondayBased = (first.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -354,14 +406,20 @@ function CalendarCard({ upcoming, scheduledCount }: { upcoming: UpcomingRow[]; s
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="font-semibold tracking-tight">Ближайшие публикации</h3>
-            <p className="mt-1 text-sm capitalize text-slate-500">{monthLabel}</p>
+            <h3 className="font-semibold tracking-tight">
+              Ближайшие публикации
+            </h3>
+            <p className="mt-1 text-sm capitalize text-slate-500">
+              {monthLabel}
+            </p>
           </div>
           <Badge variant="primary">{scheduledCount} в очереди</Badge>
         </div>
 
         <div className="mt-5 grid grid-cols-7 gap-1 text-center text-xs text-slate-400">
-          {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => <div key={d}>{d}</div>)}
+          {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((d) => (
+            <div key={d}>{d}</div>
+          ))}
         </div>
         <div className="mt-2 grid grid-cols-7 gap-1 text-center text-sm">
           {visibleCells.map((d, idx) => {
@@ -369,13 +427,20 @@ function CalendarCard({ upcoming, scheduledCount }: { upcoming: UpcomingRow[]; s
             const current = new Date(year, month, d);
             const dateKey = toDateKey(current);
             const posts = byDate.get(dateKey) ?? [];
-            const isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+            const isToday =
+              d === today.getDate() &&
+              month === today.getMonth() &&
+              year === today.getFullYear();
             const dayNode = (
               <>
-                <div className={`flex h-8 w-8 items-center justify-center rounded-xl transition-base ${isToday ? 'bg-primary text-white shadow-sm' : posts.length ? 'text-slate-800 hover:bg-indigo-50 hover:text-primary' : 'text-slate-500 hover:bg-slate-50'}`}>
+                <div
+                  className={`flex h-8 w-8 items-center justify-center rounded-xl transition-base ${isToday ? "bg-primary text-white shadow-sm" : posts.length ? "text-slate-800 hover:bg-indigo-50 hover:text-primary" : "text-slate-500 hover:bg-slate-50"}`}
+                >
                   {d}
                 </div>
-                <span className={`h-1 w-1 rounded-full ${posts.length ? 'bg-primary' : 'bg-transparent'}`} />
+                <span
+                  className={`h-1 w-1 rounded-full ${posts.length ? "bg-primary" : "bg-transparent"}`}
+                />
               </>
             );
             return posts.length ? (
@@ -388,7 +453,10 @@ function CalendarCard({ upcoming, scheduledCount }: { upcoming: UpcomingRow[]; s
                 {dayNode}
               </Link>
             ) : (
-              <div key={dateKey} className="flex flex-col items-center gap-1 py-1">
+              <div
+                key={dateKey}
+                className="flex flex-col items-center gap-1 py-1"
+              >
                 {dayNode}
               </div>
             );
@@ -399,7 +467,9 @@ function CalendarCard({ upcoming, scheduledCount }: { upcoming: UpcomingRow[]; s
           <div className="mt-5 space-y-2 border-t border-slate-100 pt-4">
             {upcoming.slice(0, 3).map((row) => {
               const post = Array.isArray(row.posts) ? row.posts[0] : row.posts;
-              const channel = Array.isArray(row.channels) ? row.channels[0] : row.channels;
+              const channel = Array.isArray(row.channels)
+                ? row.channels[0]
+                : row.channels;
               return (
                 <Link
                   key={row.id}
@@ -407,11 +477,15 @@ function CalendarCard({ upcoming, scheduledCount }: { upcoming: UpcomingRow[]; s
                   className="block rounded-2xl p-2 transition-base hover:bg-slate-50"
                 >
                   <div className="flex items-center justify-between gap-2 text-xs text-slate-400">
-                    <span className="truncate">{channel?.title ?? 'Канал'}</span>
-                    {row.scheduled_at && <LocalTimeLabel utcIso={row.scheduled_at} />}
+                    <span className="truncate">
+                      {channel?.title ?? "Канал"}
+                    </span>
+                    {row.scheduled_at && (
+                      <LocalTimeLabel utcIso={row.scheduled_at} />
+                    )}
                   </div>
                   <div className="mt-1 line-clamp-1 text-sm font-medium text-slate-800">
-                    {post?.content?.trim() || '(без текста)'}
+                    {post?.content?.trim() || "(без текста)"}
                   </div>
                 </Link>
               );
@@ -442,10 +516,14 @@ function ChannelsCard({ channels }: { channels: ChannelRow[] }) {
 
         <div className="mt-4 space-y-2">
           {channels.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500">Каналов пока нет</p>
+            <p className="py-6 text-center text-sm text-slate-500">
+              Каналов пока нет
+            </p>
           ) : (
             channels.map((ch, index) => {
-              const href = ch.username ? `https://t.me/${ch.username}` : '/dashboard/channels';
+              const href = ch.username
+                ? `https://t.me/${ch.username}`
+                : "/dashboard/channels";
               const isExternal = Boolean(ch.username);
               const content = (
                 <>
@@ -453,17 +531,29 @@ function ChannelsCard({ channels }: { channels: ChannelRow[] }) {
                     <Send className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{ch.title}</div>
-                    <div className="truncate text-xs text-slate-400">{ch.username ? `@${ch.username}` : 'private'}</div>
+                    <div className="truncate text-sm font-semibold">
+                      {ch.title}
+                    </div>
+                    <div className="truncate text-xs text-slate-400">
+                      {ch.username ? `@${ch.username}` : "private"}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-right text-xs">
                     <div>
-                      <div className="font-semibold text-slate-700">#{index + 1}</div>
-                      <div className={ch.is_active ? 'text-emerald-600' : 'text-slate-400'}>
-                        {ch.is_active ? 'active' : 'off'}
+                      <div className="font-semibold text-slate-700">
+                        #{index + 1}
+                      </div>
+                      <div
+                        className={
+                          ch.is_active ? "text-emerald-600" : "text-slate-400"
+                        }
+                      >
+                        {ch.is_active ? "active" : "off"}
                       </div>
                     </div>
-                    {isExternal && <ExternalLink className="h-3.5 w-3.5 text-slate-300" />}
+                    {isExternal && (
+                      <ExternalLink className="h-3.5 w-3.5 text-slate-300" />
+                    )}
                   </div>
                 </>
               );
@@ -478,7 +568,11 @@ function ChannelsCard({ channels }: { channels: ChannelRow[] }) {
                   {content}
                 </a>
               ) : (
-                <Link key={ch.id} href={href} className="flex items-center gap-3 rounded-2xl p-2 transition-base hover:bg-slate-50">
+                <Link
+                  key={ch.id}
+                  href={href}
+                  className="flex items-center gap-3 rounded-2xl p-2 transition-base hover:bg-slate-50"
+                >
                   {content}
                 </Link>
               );
@@ -505,14 +599,15 @@ function StatCard({
   caption: string;
   icon: React.ComponentType<{ className?: string }>;
   href: string;
-  tone: 'blue' | 'emerald' | 'violet';
+  tone: "blue" | "emerald" | "violet";
 }) {
   const showLimit = limit !== undefined && !isUnlimited(limit);
-  const percent = showLimit && limit! > 0 ? Math.min(100, (value / limit!) * 100) : 0;
+  const percent =
+    showLimit && limit! > 0 ? Math.min(100, (value / limit!) * 100) : 0;
   const toneClass = {
-    blue: 'from-sky-50 text-sky-700 bg-sky-100',
-    emerald: 'from-emerald-50 text-emerald-700 bg-emerald-100',
-    violet: 'from-violet-50 text-violet-700 bg-violet-100',
+    blue: "from-sky-50 text-sky-700 bg-sky-100",
+    emerald: "from-emerald-50 text-emerald-700 bg-emerald-100",
+    violet: "from-violet-50 text-violet-700 bg-violet-100",
   }[tone];
 
   return (
@@ -520,20 +615,33 @@ function StatCard({
       <Card className="h-full overflow-hidden rounded-[24px] border-slate-200 bg-white shadow-[0_22px_60px_-52px_rgba(15,23,42,0.9)] transition-base group-hover:-translate-y-0.5 group-hover:shadow-[0_24px_70px_-48px_rgba(15,23,42,0.95)]">
         <CardContent className="p-5">
           <div className="flex items-start gap-4">
-            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${toneClass}`}>
+            <div
+              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${toneClass}`}
+            >
               <Icon className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                {label}
+              </div>
               <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-3xl font-semibold tracking-tight text-slate-950">{value}</span>
-                {showLimit && <span className="text-sm text-slate-400">/ {limit}</span>}
-                {!showLimit && limit !== undefined && <span className="text-sm text-slate-400">/ ∞</span>}
+                <span className="text-3xl font-semibold tracking-tight text-slate-950">
+                  {value}
+                </span>
+                {showLimit && (
+                  <span className="text-sm text-slate-400">/ {limit}</span>
+                )}
+                {!showLimit && limit !== undefined && (
+                  <span className="text-sm text-slate-400">/ ∞</span>
+                )}
               </div>
               <div className="mt-1 text-sm text-slate-500">{caption}</div>
               {showLimit && (
                 <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full rounded-full bg-primary transition-base" style={{ width: `${percent}%` }} />
+                  <div
+                    className="h-full rounded-full bg-primary transition-base"
+                    style={{ width: `${percent}%` }}
+                  />
                 </div>
               )}
             </div>
@@ -552,20 +660,23 @@ function SubscriptionBanner({
   ctaLabel,
   ctaHref,
 }: {
-  tone: 'primary' | 'warning';
+  tone: "primary" | "warning";
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
   ctaLabel: string;
   ctaHref: string;
 }) {
-  const toneClasses = tone === 'warning'
-    ? 'border-amber-200 bg-amber-50 text-amber-950'
-    : 'border-indigo-100 bg-indigo-50 text-slate-950';
-  const iconColor = tone === 'warning' ? 'text-amber-600' : 'text-primary';
+  const toneClasses =
+    tone === "warning"
+      ? "border-amber-200 bg-amber-50 text-amber-950"
+      : "border-indigo-100 bg-indigo-50 text-slate-950";
+  const iconColor = tone === "warning" ? "text-amber-600" : "text-primary";
 
   return (
-    <div className={`flex flex-col gap-4 rounded-[24px] border p-5 shadow-sm sm:flex-row sm:items-center ${toneClasses}`}>
+    <div
+      className={`flex flex-col gap-4 rounded-[24px] border p-5 shadow-sm sm:flex-row sm:items-center ${toneClasses}`}
+    >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
         <Icon className={`h-5 w-5 ${iconColor}`} />
       </div>
@@ -592,13 +703,18 @@ function OnboardingCard() {
               Быстрый старт
             </Badge>
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">Подключи Telegram-канал — займёт минуту</h2>
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                Подключи Telegram-канал — займёт минуту
+              </h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                После подключения ты сможешь планировать посты, вести очередь публикаций и привязывать рекламодателей.
+                После подключения ты сможешь планировать посты, вести очередь
+                публикаций и привязывать рекламодателей.
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              <OnboardingStep n={1}>Создай бота через <span className="kbd">@BotFather</span></OnboardingStep>
+              <OnboardingStep n={1}>
+                Создай бота через <span className="kbd">@BotFather</span>
+              </OnboardingStep>
               <OnboardingStep n={2}>Вставь токен в Постплан</OnboardingStep>
               <OnboardingStep n={3}>Добавь бота админом в канал</OnboardingStep>
               <OnboardingStep n={4}>Подключи канал по username</OnboardingStep>
@@ -616,7 +732,13 @@ function OnboardingCard() {
   );
 }
 
-function OnboardingStep({ n, children }: { n: number; children: React.ReactNode }) {
+function OnboardingStep({
+  n,
+  children,
+}: {
+  n: number;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-sm text-slate-700">
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-xs font-semibold text-primary shadow-sm">
@@ -628,21 +750,23 @@ function OnboardingStep({ n, children }: { n: number; children: React.ReactNode 
 }
 
 function ActivityBadge({ status }: { status: string }) {
-  if (status === 'sent') return <Badge variant="success">отправлен</Badge>;
-  if (status === 'failed') return <Badge variant="destructive">ошибка</Badge>;
-  if (status === 'processing') return <Badge variant="warning">отправляется</Badge>;
-  if (status === 'pending') return <Badge variant="primary">запланирован</Badge>;
-  if (status === 'cancelled') return <Badge>отменён</Badge>;
+  if (status === "sent") return <Badge variant="success">отправлен</Badge>;
+  if (status === "failed") return <Badge variant="destructive">ошибка</Badge>;
+  if (status === "processing")
+    return <Badge variant="warning">отправляется</Badge>;
+  if (status === "pending")
+    return <Badge variant="primary">запланирован</Badge>;
+  if (status === "cancelled") return <Badge>отменён</Badge>;
   return <Badge>{status}</Badge>;
 }
 
 function greetingByHour(): string {
   const h = new Date().getHours();
-  if (h < 5) return 'Глубокая ночь';
-  if (h < 12) return 'Доброе утро';
-  if (h < 18) return 'Добрый день';
-  if (h < 23) return 'Добрый вечер';
-  return 'Глубокая ночь';
+  if (h < 5) return "Глубокая ночь";
+  if (h < 12) return "Доброе утро";
+  if (h < 18) return "Добрый день";
+  if (h < 23) return "Добрый вечер";
+  return "Глубокая ночь";
 }
 
 function startOfLocalDay(date: Date): Date {
@@ -653,8 +777,8 @@ function startOfLocalDay(date: Date): Date {
 
 function toDateKey(date: Date): string {
   const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
 

@@ -22,6 +22,20 @@ const MAX_RETRIES = 5;
 const TG_API = 'https://api.telegram.org';
 const STORAGE_BUCKET = 'post-media';
 
+
+function getSupabaseEnv() {
+  const supabaseUrl =
+    Deno.env.get('SUPABASE_URL') ?? Deno.env.get('POSTPLAN_SUPABASE_URL');
+  const serviceKey =
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('POSTPLAN_SERVICE_ROLE_KEY');
+  return { supabaseUrl, serviceKey };
+}
+
+function pickOne<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
 // ---- Types ----------------------------------------------------------------
 type MediaKind = 'photo' | 'video' | 'animation';
 
@@ -53,8 +67,13 @@ interface ScheduledRow {
     title: string;
     username: string | null;
     telegram_chat_id: string;
-    bots: { token_encrypted: string } | null;
-  } | null;
+    bots: { token_encrypted: string | null } | { token_encrypted: string | null }[] | null;
+  } | {
+    title: string;
+    username: string | null;
+    telegram_chat_id: string;
+    bots: { token_encrypted: string | null } | { token_encrypted: string | null }[] | null;
+  }[] | null;
 }
 
 // ---- Template variable substitution (mirror of src/lib/templates.ts) ------
@@ -275,13 +294,16 @@ function nextRetryAt(retryCount: number): string {
 
 // ---- Main handler ---------------------------------------------------------
 Deno.serve(async (_req) => {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const { supabaseUrl, serviceKey } = getSupabaseEnv();
   const encryptionKey = Deno.env.get('ENCRYPTION_KEY')!;
 
   if (!supabaseUrl || !serviceKey || !encryptionKey) {
     return new Response(
-      JSON.stringify({ error: 'Missing env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ENCRYPTION_KEY' }),
+      JSON.stringify({
+        ok: false,
+        error: 'Missing env: Supabase URL, service role key, or ENCRYPTION_KEY',
+        hint: 'Use built-in SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY or custom POSTPLAN_SUPABASE_URL/POSTPLAN_SERVICE_ROLE_KEY',
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
@@ -331,11 +353,11 @@ Deno.serve(async (_req) => {
   let failed = 0;
 
   for (const row of rows) {
-    const post = row.posts;
-    const channel = row.channels;
-    const bot = channel?.bots;
+    const post = pickOne(row.posts as any) as ScheduledRow['posts'];
+    const channel = pickOne(row.channels);
+    const bot = pickOne(channel?.bots);
 
-    if (!post || !channel || !bot) {
+    if (!post || !channel || !bot?.token_encrypted) {
       await supabase
         .from('scheduled_posts')
         .update({ status: 'failed', error_message: 'Missing post/channel/bot relation' })
@@ -383,7 +405,7 @@ Deno.serve(async (_req) => {
           .from(STORAGE_BUCKET)
           .download(mr.storage_path);
         if (dlErr || !blob) {
-          throw new Error(`Не удалось скачать медиа из Storage: ${mr.storage_path}`);
+          throw new Error(`Не удалось скачать медиа из Storage: ${mr.storage_path}. ${dlErr?.message ?? 'Файл не найден или недоступен'}`);
         }
         media.push({
           kind: mr.type,
