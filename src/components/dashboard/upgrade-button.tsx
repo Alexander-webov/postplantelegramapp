@@ -23,10 +23,17 @@ export function UpgradeButton({ tier, priceRub, tierName }: Props) {
   function handleClick() {
     startTransition(async () => {
       const result = await createPaymentAction(tier);
+
+      if (!result) {
+        toast.error('Не удалось создать платёж: пустой ответ сервера', { duration: 8000 });
+        return;
+      }
+
       if ('error' in result) {
         toast.error(result.error, { duration: 8000 });
         return;
       }
+
       // Redirect to YooKassa — full page navigation, not router.push
       window.location.href = result.confirmation_url;
     });

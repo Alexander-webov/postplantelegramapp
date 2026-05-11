@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth/helpers';
 import {
   classifyMime,
@@ -71,7 +71,9 @@ export async function uploadMediaAction(formData: FormData): Promise<UploadResul
   const filename = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${safeExt}`;
   const path = `${user.id}/${filename}`;
 
-  const supabase = await createClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createServiceClient()
+    : await createClient();
 
   const { error: uploadErr } = await supabase.storage
     .from('post-media')
@@ -119,7 +121,9 @@ export async function deleteMediaAction(formData: FormData): Promise<{ error?: s
     return { error: 'Нельзя удалить чужой файл' };
   }
 
-  const supabase = await createClient();
+  const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createServiceClient()
+    : await createClient();
   const { error } = await supabase.storage.from('post-media').remove([path]);
   if (error) return { error: error.message };
   return { success: true };
