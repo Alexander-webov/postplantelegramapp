@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useRef, useTransition } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Image as ImageIcon, Video as VideoIcon, X, Upload, FileWarning } from 'lucide-react';
-import { uploadMediaAction, deleteMediaAction } from '@/app/actions/media';
+import {
+  Image as ImageIcon,
+  Video as VideoIcon,
+  X,
+  Upload,
+  FileWarning,
+} from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export interface UploadedMedia {
   path: string;
@@ -17,11 +23,25 @@ export interface UploadedMedia {
 interface MediaUploaderProps {
   value: UploadedMedia[];
   onChange: (next: UploadedMedia[]) => void;
-  /** Hard cap (default 10 — Telegram album limit). */
+  /** Hard cap. Telegram album limit is 10. */
   maxItems?: number;
 }
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm';
+
+const ALLOWED_MIMES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+]);
+
+const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+const ANIMATION_MAX_BYTES = 50 * 1024 * 1024;
 
 function humanSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -29,12 +49,55 @@ function humanSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function classifyMime(mime: string): UploadedMedia['kind'] | null {
+  if (mime === 'image/gif') return 'animation';
+  if (mime.startsWith('image/')) return 'photo';
+  if (mime.startsWith('video/')) return 'video';
+  return null;
+}
+
+function maxBytesFor(kind: UploadedMedia['kind']): number {
+  if (kind === 'photo') return PHOTO_MAX_BYTES;
+  if (kind === 'animation') return ANIMATION_MAX_BYTES;
+  return VIDEO_MAX_BYTES;
+}
+
+function getSafeExt(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() || 'bin';
+  return /^[a-z0-9]{1,8}$/.test(ext) ? ext : 'bin';
+}
+
+type ValidationResult =
+  | { ok: true; kind: UploadedMedia['kind'] }
+  | { ok: false; error: string };
+
+function validateFile(file: File): ValidationResult {
+  if (!ALLOWED_MIMES.has(file.type)) {
+    return {
+      ok: false,
+      error: `Неподдерживаемый тип файла: ${file.type || 'неизвестно'}. Разрешены: JPG, PNG, WebP, GIF, MP4, MOV, WebM`,
+    };
+  }
+
+  const kind = classifyMime(file.type);
+  if (!kind) return { ok: false, error: 'Не удалось определить тип файла' };
+
+  const maxBytes = maxBytesFor(kind);
+  if (file.size > maxBytes) {
+    return {
+      ok: false,
+      error: `Файл слишком большой (${humanSize(file.size)}). Максимум: ${humanSize(maxBytes)}`,
+    };
+  }
+
+  return { ok: true, kind };
+}
+
 export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [pending, startTransition] = useTransition();
   const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  // Album rule preview: animation alone in album is invalid
   const hasAnimation = value.some((v) => v.kind === 'animation');
   const albumWithAnimationWarning =
     hasAnimation && value.length > 1
@@ -42,21 +105,64 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
       : null;
 
   function pickFiles() {
-    inputRef.current?.click();
+    if (!uploading) inputRef.current?.click();
   }
 
-  async function uploadOne(file: File) {
-    const fd = new FormData();
-    fd.append('file', file);
-    const result = await uploadMediaAction(fd);
-    if ('error' in result) {
-      toast.error(`${file.name}: ${result.error}`);
+  async function uploadOne(file: File): Promise<UploadedMedia | null> {
+    const validation = validateFile(file);
+    if (!validation.ok) {
+      toast.error(`${file.name}: ${validation.error}`);
       return null;
     }
-    return result;
+    const { kind } = validation;
+
+    const supabase = createClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      toast.error('Сессия истекла. Войди заново и повтори загрузку.');
+      return null;
+    }
+
+    const ext = getSafeExt(file.name);
+    const storageName = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const path = `${user.id}/${storageName}`;
+
+    const { error: uploadError } = await supabase.storage.from('post-media').upload(path, file, {
+      contentType: file.type,
+      upsert: false,
+    });
+
+    if (uploadError) {
+      console.error('Media upload failed:', uploadError);
+      toast.error(`${file.name}: не удалось загрузить (${uploadError.message})`);
+      return null;
+    }
+
+    const { data: signed, error: signedError } = await supabase.storage
+      .from('post-media')
+      .createSignedUrl(path, 60 * 60);
+
+    if (signedError) {
+      console.warn('Preview signed URL failed:', signedError);
+    }
+
+    return {
+      path,
+      kind,
+      mime: file.type,
+      size: file.size,
+      filename: file.name,
+      preview_url: signed?.signedUrl ?? null,
+    };
   }
 
-  function handleFiles(files: FileList | File[]) {
+  async function handleFiles(files: FileList | File[]) {
+    if (uploading) return;
+
     const arr = Array.from(files);
     if (arr.length === 0) return;
 
@@ -65,68 +171,93 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
       toast.error(`Максимум ${maxItems} файлов`);
       return;
     }
+
     const toUpload = arr.slice(0, remaining);
     if (arr.length > remaining) {
       toast.warning(`Загружу только ${remaining} из ${arr.length} (лимит ${maxItems})`);
     }
 
-    startTransition(async () => {
+    setUploading(true);
+
+    try {
       const uploaded: UploadedMedia[] = [];
-      for (const f of toUpload) {
-        const r = await uploadOne(f);
-        if (r) uploaded.push(r);
+
+      for (const file of toUpload) {
+        const result = await uploadOne(file);
+        if (result) uploaded.push(result);
       }
+
       if (uploaded.length > 0) {
         onChange([...value, ...uploaded]);
-        toast.success(
-          uploaded.length === 1 ? 'Файл загружен' : `Загружено: ${uploaded.length}`
-        );
+        toast.success(uploaded.length === 1 ? 'Файл загружен' : `Загружено: ${uploaded.length}`);
       }
-    });
+    } catch (error) {
+      console.error('Unexpected media upload error:', error);
+      toast.error(error instanceof Error ? error.message : 'Не удалось загрузить файл');
+    } finally {
+      setUploading(false);
+      setDragActive(false);
+    }
   }
 
-  function removeAt(index: number) {
+  async function removeAt(index: number) {
     const item = value[index];
     if (!item) return;
-    // Optimistic UI removal; storage cleanup is best-effort
-    const next = value.filter((_, i) => i !== index);
-    onChange(next);
 
-    const fd = new FormData();
-    fd.append('path', item.path);
-    deleteMediaAction(fd).catch(() => {
-      // Non-fatal — orphan files in storage will be cleaned up later
-      // (we'll add a retention job in the future)
-    });
+    onChange(value.filter((_, i) => i !== index));
+
+    const supabase = createClient();
+    const { error } = await supabase.storage.from('post-media').remove([item.path]);
+
+    if (error) {
+      console.warn('Media delete failed:', error);
+    }
   }
 
-  function onDrop(e: React.DragEvent) {
+  function onDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
+
+    if (e.dataTransfer.files?.length) {
+      void handleFiles(e.dataTransfer.files);
+    }
   }
 
   return (
     <div className="space-y-3">
       <div
+        role="button"
+        tabIndex={0}
         onClick={pickFiles}
-        onDragOver={(e) => {
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') pickFiles();
+        }}
+        onDragEnter={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           setDragActive(true);
         }}
-        onDragLeave={() => setDragActive(false)}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragActive(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragActive(false);
+        }}
         onDrop={onDrop}
         className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed p-6 text-center transition ${
           dragActive
             ? 'border-primary bg-primary/5'
             : 'border-border hover:border-primary/50 hover:bg-accent/30'
-        } ${pending ? 'pointer-events-none opacity-60' : ''}`}
+        } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
       >
         <Upload className="h-6 w-6 text-muted-foreground" />
         <div className="text-sm">
-          <span className="font-medium">
-            {pending ? 'Загружаю…' : 'Перетащи файлы сюда'}
-          </span>{' '}
+          <span className="font-medium">{uploading ? 'Загружаю…' : 'Перетащи файлы сюда'}</span>{' '}
           <span className="text-muted-foreground">или нажми чтобы выбрать</span>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -138,22 +269,21 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
           multiple
           accept={ACCEPT}
           className="hidden"
+          disabled={uploading}
           onChange={(e) => {
-            if (e.target.files) handleFiles(e.target.files);
-            // reset so the same file can be re-selected after removal
+            if (e.target.files) void handleFiles(e.target.files);
             e.target.value = '';
           }}
         />
       </div>
 
-      {/* Hidden inputs that POST the storage paths back to the server action */}
-      {value.map((m) => (
-        <input key={m.path} type="hidden" name="media_paths" value={m.path} />
+      {value.map((media) => (
+        <input key={media.path} type="hidden" name="media_paths" value={media.path} />
       ))}
 
       {value.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {value.map((item, i) => (
+          {value.map((item, index) => (
             <div
               key={item.path}
               className="group relative aspect-square overflow-hidden rounded-md border bg-muted"
@@ -180,21 +310,18 @@ export function MediaUploader({ value, onChange, maxItems = 10 }: MediaUploaderP
                 </div>
               )}
 
-              {/* Position badge */}
               <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-                #{i + 1}
+                #{index + 1}
               </span>
 
-              {/* Kind + size */}
               <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
                 {item.kind === 'photo' ? 'фото' : item.kind === 'video' ? 'видео' : 'GIF'} ·{' '}
                 {humanSize(item.size)}
               </span>
 
-              {/* Remove button */}
               <button
                 type="button"
-                onClick={() => removeAt(i)}
+                onClick={() => void removeAt(index)}
                 className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition hover:bg-destructive group-hover:opacity-100"
                 aria-label="Удалить"
               >
