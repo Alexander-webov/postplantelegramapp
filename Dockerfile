@@ -50,6 +50,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# libc6-compat is required by sharp's prebuilt native binaries on Alpine
+RUN apk add --no-cache libc6-compat
+
 # Run as non-root for safety
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
@@ -59,6 +62,11 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# sharp is used by next/image for runtime image optimization. Next.js standalone
+# output tracer doesn't always pick it up, so we copy it explicitly from the
+# builder's node_modules into the runtime's node_modules.
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 
 USER nextjs
 

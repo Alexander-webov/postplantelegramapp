@@ -786,6 +786,10 @@ function PublicFooter() {
             hello@postplan-tg.ru
           </a>
         </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-4 text-xs text-muted-foreground">
+          <p>Жуков Александр Александрович</p>
+          <p>ИНН 575106298345</p>
+        </div>
       </div>
     </footer>
   );

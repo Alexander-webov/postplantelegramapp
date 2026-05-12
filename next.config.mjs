@@ -18,6 +18,16 @@ const nextConfig = {
       bodySizeLimit: '50mb',
     },
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.postplan-tg.ru' }],
+        destination: 'https://postplan-tg.ru/:path*',
+        permanent: true,
+      },
+    ];
+  },
 
   async headers() {
     return [
