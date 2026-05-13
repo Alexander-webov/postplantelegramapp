@@ -32,6 +32,11 @@ export async function requireUser() {
  * created before the trigger existed, or if there were column constraints) —
  * we create it on the fly here instead of crashing the whole dashboard with
  * PGRST116 "0 rows".
+ *
+ * The backfill insert uses the service-role client because the `profiles`
+ * table has SELECT and UPDATE RLS policies but no INSERT policy (only the
+ * SECURITY DEFINER trigger is meant to write there). It's safe: we only
+ * insert a row whose id equals the already-authenticated user's id.
  */
 export async function getProfile() {
   const supabase = await createClient();
@@ -48,13 +53,15 @@ export async function getProfile() {
   if (data) return data;
 
   // No profile row — backfill it from auth.users data we already have
+  const { createServiceClient } = await import('@/lib/supabase/server');
+  const service = createServiceClient();
   const fallback = {
     id: user.id,
     email: user.email ?? '',
     full_name: (user.user_metadata?.full_name as string | undefined) ?? null,
   };
 
-  const { data: created, error: insertErr } = await supabase
+  const { data: created, error: insertErr } = await service
     .from('profiles')
     .insert(fallback)
     .select('*')
