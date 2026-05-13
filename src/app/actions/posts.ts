@@ -778,8 +778,8 @@ export async function clearHistoryAction(): Promise<{ error?: string; deleted?: 
 // Manual views refresh — server action
 // ============================================================================
 // Triggered by a "Refresh views" button in the queue UI. Fetches the current
-// view count via the same editMessageReplyMarkup trick the Edge Function
-// uses, then writes views_latest + views_latest_at.
+// view count from the public t.me embed page (same source the Edge Function
+// uses), then writes views_latest + views_latest_at.
 //
 // Snapshot columns (views_1h, views_6h, views_24h, views_48h) are NOT
 // touched here — those are write-once, set only by the Edge Function at
@@ -795,11 +795,15 @@ export async function refreshViewsAction(
 
   const supabase = await createClient();
 
+  // We fetch views from the public t.me embed page rather than the Bot API.
+  // Reason: Bot API has no method to read channel-post view counts. The
+  // historical editMessageReplyMarkup trick destroys inline buttons on
+  // posts that have them, and silently fails on posts that don't.
   const { data: row } = await supabase
     .from('scheduled_posts')
     .select(`
       id, status, telegram_message_id,
-      channels (telegram_chat_id, bots (token_encrypted))
+      channels (telegram_chat_id, username)
     `)
     .eq('id', scheduledId)
     .eq('user_id', user.id)
@@ -810,59 +814,25 @@ export async function refreshViewsAction(
   if (!row.telegram_message_id) return { error: 'Нет id сообщения для замера' };
 
   const channel = Array.isArray(row.channels) ? row.channels[0] : row.channels;
-  const bot = channel?.bots
-    ? Array.isArray(channel.bots) ? channel.bots[0] : channel.bots
-    : null;
+  if (!channel) return { error: 'Канал недоступен' };
 
-  if (!channel || !bot?.token_encrypted) {
-    return { error: 'Канал или бот недоступны' };
-  }
+  const { fetchPublicPostViews } = await import('@/lib/telegram/public-views');
+  const result = await fetchPublicPostViews(channel.username, row.telegram_message_id);
 
-  // Decrypt the bot token using the same helper the rest of the app uses
-  const { decrypt } = await import('@/lib/crypto');
-  let token: string;
-  try {
-    token = decrypt(bot.token_encrypted);
-  } catch {
-    return { error: 'Не удалось расшифровать токен бота' };
-  }
-
-  // Call Telegram editMessageReplyMarkup — Telegram returns updated Message
-  // with `views` for channel posts. See Edge Function comments for caveats.
-  let views: number | null = null;
-  let errorMsg: string | null = null;
-  try {
-    const res = await fetch(
-      `https://api.telegram.org/bot${token}/editMessageReplyMarkup`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: channel.telegram_chat_id,
-          message_id: row.telegram_message_id,
-          reply_markup: { inline_keyboard: [] },
-        }),
-      }
-    );
-    const data = await res.json();
-    if (data.ok && typeof data.result?.views === 'number') {
-      views = data.result.views;
-    } else {
-      errorMsg = data.description ?? 'Telegram не вернул просмотры';
-    }
-  } catch (e) {
-    errorMsg = e instanceof Error ? e.message : 'Ошибка запроса';
-  }
-
-  if (views === null) {
-    return { error: errorMsg ?? 'Просмотры недоступны для этого поста' };
+  if (result.views === null) {
+    // Save the error so it's visible in the UI alongside the post
+    await supabase
+      .from('scheduled_posts')
+      .update({ views_error: result.errorMessage })
+      .eq('id', scheduledId);
+    return { error: result.errorMessage ?? 'Просмотры недоступны' };
   }
 
   const refreshedAt = new Date().toISOString();
   await supabase
     .from('scheduled_posts')
     .update({
-      views_latest: views,
+      views_latest: result.views,
       views_latest_at: refreshedAt,
       views_error: null,
     })
@@ -875,12 +845,12 @@ export async function refreshViewsAction(
     .from('post_analytics')
     .insert({
       scheduled_post_id: scheduledId,
-      views,
+      views: result.views,
       snapshot_at: refreshedAt,
     });
 
   revalidatePath('/dashboard/queue');
   revalidatePath(`/dashboard/queue/${scheduledId}/analytics`);
   revalidatePath('/dashboard/analytics');
-  return { views, refreshedAt };
+  return { views: result.views, refreshedAt };
 }

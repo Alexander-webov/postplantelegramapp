@@ -1,9 +1,16 @@
 // =============================================================================
 // Postplan — update-views Edge Function
 // =============================================================================
-// Scheduled post view snapshots. Telegram has no stable public endpoint for
-// channel-post views, so this keeps the existing no-op edit approach but fixes
-// token decryption and gives detailed errors.
+// Scheduled view-count snapshots for published posts.
+//
+// Implementation: scrape the public t.me embed widget. This is the only
+// reliable way to read Telegram channel-post views in 2026 — the Bot API
+// has no method for it, and the historical editMessageReplyMarkup trick
+// destroys inline buttons on posts that have them.
+//
+// Snapshot windows: 1h / 6h / 24h / 48h after sent_at. Each column is
+// written exactly once, the first time the worker runs after the window
+// opens.
 //
 // Deploy:
 //   supabase functions deploy update-views --no-verify-jwt
@@ -12,11 +19,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.46.1';
 
 const BATCH_SIZE = 50;
-const TG_API = 'https://api.telegram.org';
+const TME_BASE = 'https://t.me';
+const USER_AGENT = 'Mozilla/5.0 (compatible; PostplanBot/1.0; +https://postplan-tg.ru)';
 
 type SnapshotColumn = 'views_1h' | 'views_6h' | 'views_24h' | 'views_48h';
-type BotRef = { token_encrypted: string | null };
-type ChannelRef = { telegram_chat_id: string | null; bots: BotRef | BotRef[] | null };
+type ChannelRef = { telegram_chat_id: string | null; username: string | null };
 
 interface ViewsRow {
   id: string;
@@ -41,40 +48,51 @@ function pickOne<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
-async function decryptToken(payload: string): Promise<string> {
-  const keyB64 = Deno.env.get('ENCRYPTION_KEY');
-  if (!keyB64) throw new Error('ENCRYPTION_KEY env var missing');
-
-  const keyBytes = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));
-  if (keyBytes.length !== 32) throw new Error('ENCRYPTION_KEY must decode to exactly 32 bytes');
-
-  const data = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
-  const iv = data.slice(0, 12);
-  const authTag = data.slice(12, 28);
-  const ciphertext = data.slice(28);
-  const ctWithTag = new Uint8Array(ciphertext.length + authTag.length);
-  ctWithTag.set(ciphertext, 0);
-  ctWithTag.set(authTag, ciphertext.length);
-
-  const cryptoKey = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
-  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, cryptoKey, ctWithTag);
-  return new TextDecoder().decode(decrypted);
+function parseViewsString(raw: string): number | null {
+  const cleaned = raw.trim().replace(/\s+/g, '').replace(',', '.');
+  const match = cleaned.match(/^([\d.]+)\s*([KMB])?$/i);
+  if (!match) return null;
+  const base = parseFloat(match[1]);
+  if (!Number.isFinite(base)) return null;
+  const suffix = match[2]?.toUpperCase();
+  const multiplier =
+    suffix === 'K' ? 1_000 :
+    suffix === 'M' ? 1_000_000 :
+    suffix === 'B' ? 1_000_000_000 :
+    1;
+  return Math.round(base * multiplier);
 }
 
-async function fetchViews(token: string, chatId: string, messageId: number): Promise<{ views: number | null; error: string | null }> {
+function extractViewsFromHtml(html: string): number | null {
+  const match = html.match(
+    /<span[^>]*class="[^"]*tgme_widget_message_views[^"]*"[^>]*>([^<]+)<\/span>/i,
+  );
+  if (!match) return null;
+  return parseViewsString(match[1]);
+}
+
+async function fetchPublicPostViews(
+  username: string | null,
+  messageId: number,
+): Promise<{ views: number | null; error: string | null }> {
+  if (!username) return { views: null, error: 'Приватный канал — публичная страница недоступна' };
+
+  const cleaned = username.replace(/^@/, '');
+  const url = `${TME_BASE}/${cleaned}/${messageId}?embed=1&mode=tme`;
+
   try {
-    const res = await fetch(`${TG_API}/bot${token}/editMessageReplyMarkup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }),
+    const res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' },
+      signal: AbortSignal.timeout(8000),
     });
-    const data = await res.json();
-    if (!data.ok) return { views: null, error: data.description ?? 'unknown Telegram error' };
-    return typeof data.result?.views === 'number'
-      ? { views: data.result.views, error: null }
-      : { views: null, error: 'Telegram response has no views field' };
+    if (res.status === 404) return { views: null, error: 'Пост не найден на t.me' };
+    if (!res.ok) return { views: null, error: `t.me ответил статусом ${res.status}` };
+    const html = await res.text();
+    const views = extractViewsFromHtml(html);
+    if (views === null) return { views: null, error: 'Просмотры не найдены на странице поста' };
+    return { views, error: null };
   } catch (e) {
-    return { views: null, error: e instanceof Error ? e.message : 'Telegram fetch failed' };
+    return { views: null, error: e instanceof Error ? e.message : 't.me fetch failed' };
   }
 }
 
@@ -92,10 +110,10 @@ Deno.serve(async (_req) => {
   const { supabaseUrl, serviceKey } = getSupabaseEnv();
 
   if (!supabaseUrl || !serviceKey) {
-    return new Response(JSON.stringify({ ok: false, error: 'Missing Supabase URL or service role key' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ ok: false, error: 'Missing Supabase URL or service role key' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    );
   }
 
   const supabase = createClient(supabaseUrl, serviceKey);
@@ -105,7 +123,7 @@ Deno.serve(async (_req) => {
     .select(`
       id, user_id, sent_at, telegram_message_id,
       views_1h, views_6h, views_24h, views_48h,
-      channels (telegram_chat_id, bots (token_encrypted))
+      channels (telegram_chat_id, username)
     `)
     .eq('status', 'sent')
     .not('sent_at', 'is', null)
@@ -129,9 +147,17 @@ Deno.serve(async (_req) => {
   }
 
   if (due.length === 0) {
-    return new Response(JSON.stringify({ ok: true, processed: 0, snapshotted: 0, failed: 0, reason: 'No due posts', ms: Date.now() - startedAt }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        processed: 0,
+        snapshotted: 0,
+        failed: 0,
+        reason: 'No due posts',
+        ms: Date.now() - startedAt,
+      }),
+      { headers: { 'Content-Type': 'application/json' } },
+    );
   }
 
   let snapshotted = 0;
@@ -140,37 +166,31 @@ Deno.serve(async (_req) => {
 
   for (const { row, column } of due) {
     const channel = pickOne(row.channels);
-    const bot = pickOne(channel?.bots);
 
-    if (!channel?.telegram_chat_id || !bot?.token_encrypted || !row.telegram_message_id) {
-      const error = 'Канал, бот, токен или message_id отсутствуют';
-      await supabase.from('scheduled_posts').update({ [column]: 0, views_error: error }).eq('id', row.id);
+    if (!channel || !row.telegram_message_id) {
+      const error = 'Канал или message_id отсутствуют';
+      await supabase
+        .from('scheduled_posts')
+        .update({ views_error: error })
+        .eq('id', row.id);
       failed++;
       errors.push({ scheduled_post_id: row.id, error });
       continue;
     }
 
-    let token: string;
-    try {
-      token = await decryptToken(bot.token_encrypted);
-    } catch (e) {
-      const error = `decrypt: ${e instanceof Error ? e.message : 'decrypt failed'}`;
-      await supabase.from('scheduled_posts').update({ [column]: 0, views_error: error }).eq('id', row.id);
-      failed++;
-      errors.push({ scheduled_post_id: row.id, error });
-      continue;
-    }
-
-    const result = await fetchViews(token, channel.telegram_chat_id, row.telegram_message_id);
+    const result = await fetchPublicPostViews(channel.username, row.telegram_message_id);
     const now = new Date().toISOString();
 
     if (result.views !== null) {
-      const { error: updateErr } = await supabase.from('scheduled_posts').update({
-        [column]: result.views,
-        views_latest: result.views,
-        views_latest_at: now,
-        views_error: null,
-      }).eq('id', row.id);
+      const { error: updateErr } = await supabase
+        .from('scheduled_posts')
+        .update({
+          [column]: result.views,
+          views_latest: result.views,
+          views_latest_at: now,
+          views_error: null,
+        })
+        .eq('id', row.id);
 
       if (updateErr) {
         failed++;
@@ -192,16 +212,31 @@ Deno.serve(async (_req) => {
 
       snapshotted++;
     } else {
-      const error = result.error ?? 'unknown Telegram error';
-      await supabase.from('scheduled_posts').update({ [column]: 0, views_error: error }).eq('id', row.id);
+      // Private channels / parse failures: record the error but leave the
+      // snapshot column NULL. We don't want to permanently lock the column
+      // to 0 — the post might become reachable later (channel made public,
+      // t.me HTML format restored, etc.).
+      await supabase
+        .from('scheduled_posts')
+        .update({ views_error: result.error })
+        .eq('id', row.id);
       failed++;
-      errors.push({ scheduled_post_id: row.id, error });
+      errors.push({ scheduled_post_id: row.id, error: result.error ?? 'unknown error' });
     }
 
-    await new Promise((res) => setTimeout(res, 50));
+    // Small delay to be gentle with t.me
+    await new Promise((res) => setTimeout(res, 150));
   }
 
-  return new Response(JSON.stringify({ ok: true, processed: due.length, snapshotted, failed, errors: errors.slice(0, 10), ms: Date.now() - startedAt }), {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return new Response(
+    JSON.stringify({
+      ok: true,
+      processed: due.length,
+      snapshotted,
+      failed,
+      errors: errors.slice(0, 10),
+      ms: Date.now() - startedAt,
+    }),
+    { headers: { 'Content-Type': 'application/json' } },
+  );
 });
