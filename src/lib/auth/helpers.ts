@@ -26,15 +26,40 @@ export async function requireUser() {
 
 /**
  * Fetch the user's profile row (with subscription_tier etc.).
+ *
+ * Self-healing: if a profile row is missing — usually because the
+ * handle_new_user trigger didn't fire (it can fail silently on legacy users
+ * created before the trigger existed, or if there were column constraints) —
+ * we create it on the fly here instead of crashing the whole dashboard with
+ * PGRST116 "0 rows".
  */
 export async function getProfile() {
   const supabase = await createClient();
   const user = await requireUser();
+
+  // maybeSingle() returns null instead of throwing PGRST116 when 0 rows match
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
+
   if (error) throw error;
-  return data;
+  if (data) return data;
+
+  // No profile row — backfill it from auth.users data we already have
+  const fallback = {
+    id: user.id,
+    email: user.email ?? '',
+    full_name: (user.user_metadata?.full_name as string | undefined) ?? null,
+  };
+
+  const { data: created, error: insertErr } = await supabase
+    .from('profiles')
+    .insert(fallback)
+    .select('*')
+    .single();
+
+  if (insertErr) throw insertErr;
+  return created;
 }
