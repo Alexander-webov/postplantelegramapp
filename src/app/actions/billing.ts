@@ -1,7 +1,6 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { requireUser, getProfile } from '@/lib/auth/helpers';
 import { createYooKassaPayment } from '@/lib/yookassa';
 import { TIERS, getEffectivePrice, type SubscriptionTier } from '@/lib/tiers';
@@ -43,7 +42,13 @@ export async function createPaymentAction(
   const effective = getEffectivePrice(tier, profile.created_at);
   const chargeAmount = effective.priceRub;
 
-  const supabase = await createClient();
+  // Writes to `payments` go through the service-role client because the
+  // table only has a SELECT RLS policy ("Users see own payments"). INSERT/
+  // UPDATE are intentionally restricted to server-side flows (this action
+  // and the webhook handler). It's safe: we set user_id from the verified
+  // session and only touch rows we just created.
+  const { createServiceClient } = await import('@/lib/supabase/server');
+  const supabase = createServiceClient();
 
   // Insert a `payments` row first — gives us idempotence key + persistent record
   // even if YooKassa call fails midway.
