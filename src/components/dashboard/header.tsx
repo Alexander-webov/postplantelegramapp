@@ -11,9 +11,10 @@ import { Button } from '@/components/ui/button';
 interface HeaderProps {
   email: string;
   fullName?: string | null;
+  isAdmin?: boolean;
 }
 
-export function Header({ email, fullName }: HeaderProps) {
+export function Header({ email, fullName, isAdmin = false }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = (fullName ?? email)
     .split(/\s+|@/)[0]
@@ -23,7 +24,7 @@ export function Header({ email, fullName }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200/70 bg-[#f7f8fc]/85 px-4 backdrop-blur-xl sm:px-6 lg:px-10">
       <div className="flex items-center gap-3">
-        <MobileNavTrigger />
+        <MobileNavTrigger isAdmin={isAdmin} />
         <Link href="/dashboard" className="lg:hidden">
           <Logo />
         </Link>

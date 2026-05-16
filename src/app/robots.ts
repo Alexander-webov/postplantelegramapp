@@ -1,15 +1,26 @@
 import type { MetadataRoute } from 'next';
 
+/**
+ * robots.txt for postplan-tg.ru.
+ *
+ * Allow: landing, /blog, /legal, /signup, /login — everything a search
+ * engine should index.
+ *
+ * Disallow: /dashboard, /admin, /api, /r — user data, admin panel, JSON
+ * endpoints, and per-placement reports (those have unique slugs we don't
+ * want spidered).
+ */
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://postplan.app';
+  const BASE = 'https://postplan-tg.ru';
   return {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/legal/', '/login', '/signup'],
-        disallow: ['/dashboard/', '/api/', '/r/'],
+        allow: ['/', '/blog', '/blog/', '/legal/', '/login', '/signup'],
+        disallow: ['/dashboard/', '/admin/', '/api/', '/r/'],
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
+    sitemap: `${BASE}/sitemap.xml`,
+    host: BASE,
   };
 }

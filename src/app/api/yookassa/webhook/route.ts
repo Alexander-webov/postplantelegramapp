@@ -7,24 +7,19 @@
  *   payment.waiting_for_capture — only relevant if we don't auto-capture (we do)
  *   refund.succeeded      — refund completed (we don't auto-handle this yet)
  *
- * Authenticity check: as of 2026, the YooKassa dashboard accepts only a plain
- * URL for HTTP notifications (no Basic Auth in URL anymore), so we can't rely
- * on a shared secret in the Authorization header. Instead we use call-back
- * verification: take the payment id from the webhook body, query the YooKassa
- * API ourselves with our SHOP_ID/SECRET_KEY, and trust only what the API
- * returns. An attacker can fake a webhook body, but they can't conjure a real
- * payment with a matching id on our merchant account.
+ * Auth: HTTP Basic — set in YooKassa dashboard, matched against
+ *       env YOOKASSA_WEBHOOK_BASIC_AUTH ("user:pass").
  *
  * Idempotence: each event has `object.id` (the payment id). If we've already
  * processed a webhook for this payment with the same status, we no-op.
  *
  * Use service-role client because RLS would block the webhook from updating
- * other users' rows. The webhook is server-only and verified above.
+ * other users' rows. The webhook is server-only and authenticated via Basic.
  */
 
 import { NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
-import { getYooKassaPayment } from '@/lib/yookassa';
+import { verifyWebhookAuth } from '@/lib/yookassa';
 import type { SubscriptionTier } from '@/lib/tiers';
 
 interface YooKassaEvent {
@@ -51,7 +46,14 @@ function getServiceClient() {
 }
 
 export async function POST(request: Request) {
-  // 1. Parse body — we need at least the payment id to authenticate the event
+  // 1. Verify webhook authentication
+  const authHeader = request.headers.get('authorization');
+  if (!verifyWebhookAuth(authHeader)) {
+    console.warn('YooKassa webhook: auth failed');
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // 2. Parse body
   let body: YooKassaEvent;
   try {
     body = (await request.json()) as YooKassaEvent;
@@ -61,31 +63,6 @@ export async function POST(request: Request) {
 
   if (body.type !== 'notification') {
     return NextResponse.json({ error: 'Unexpected type' }, { status: 400 });
-  }
-
-  // 2. Call-back verification: re-fetch the payment from YooKassa using our
-  //    own API credentials. This is what makes the webhook trustworthy:
-  //    even if an attacker POSTs a forged "payment.succeeded" body to us,
-  //    they can't make the YooKassa API confirm it.
-  let verified;
-  try {
-    verified = await getYooKassaPayment(body.object.id);
-  } catch (e) {
-    console.error(`YooKassa webhook: verification failed for ${body.object.id}`, e);
-    // Return 200 anyway — if the id doesn't exist on YooKassa's side, we
-    // simply drop the event. Returning 5xx would cause infinite retries.
-    return NextResponse.json({ ok: true, ignored: 'verification_failed' });
-  }
-
-  // Sanity checks: the status / paid flag in the webhook body must match
-  // what the API tells us. If they diverge, trust the API.
-  if (verified.status !== body.object.status) {
-    console.warn(
-      `YooKassa webhook: status mismatch for ${body.object.id} ` +
-        `(webhook=${body.object.status}, api=${verified.status}) — using API value`,
-    );
-    body.object.status = verified.status;
-    body.object.paid = verified.paid;
   }
 
   console.log(`YooKassa webhook received: ${body.event} for payment ${body.object.id}`);

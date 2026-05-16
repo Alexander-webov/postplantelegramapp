@@ -6,15 +6,16 @@ import { Diamond } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Logo } from '@/components/dashboard/logo';
 import {
-  PRIMARY_NAV, SECONDARY_NAV, FOOTER_NAV, type NavItem,
+  PRIMARY_NAV, SECONDARY_NAV, FOOTER_NAV, ADMIN_NAV, type NavItem,
 } from '@/components/dashboard/nav-config';
 
 interface SidebarProps {
   tierName?: string;
   expiresAt?: string | null;
+  isAdmin?: boolean;
 }
 
-export function Sidebar({ tierName = 'Free', expiresAt }: SidebarProps) {
+export function Sidebar({ tierName = 'Free', expiresAt, isAdmin = false }: SidebarProps) {
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 shrink-0 border-r border-slate-200/80 bg-white/95 shadow-[12px_0_35px_-28px_rgba(15,23,42,0.55)] backdrop-blur-xl lg:flex lg:flex-col">
       <div className="flex h-20 items-center px-6">
@@ -29,6 +30,7 @@ export function Sidebar({ tierName = 'Free', expiresAt }: SidebarProps) {
       <nav className="flex flex-1 flex-col gap-7 px-4 pb-4">
         <NavGroup items={PRIMARY_NAV} />
         <NavGroup items={SECONDARY_NAV} title="Управление" />
+        {isAdmin && <NavGroup items={ADMIN_NAV} title="Сервис" />}
       </nav>
 
       <div className="space-y-3 border-t border-slate-200/80 p-4">

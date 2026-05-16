@@ -132,3 +132,36 @@ export async function getYooKassaPayment(paymentId: string): Promise<YooKassaPay
   }
   return (await res.json()) as YooKassaPayment;
 }
+
+/**
+ * Verify that an incoming webhook request is actually from YooKassa.
+ *
+ * YooKassa supports two auth methods for webhooks:
+ *   1. IP whitelist (185.71.76.0/27 etc.) — we'd need to read the request's IP
+ *   2. HTTP Basic auth on the URL itself — we configure a username:password pair
+ *      in the YooKassa dashboard, and they include it in the Authorization header.
+ *
+ * We use option 2 because it works behind any proxy / Vercel / Cloudflare.
+ *
+ * Configure in YooKassa dashboard: webhook URL like
+ *   https://USER:PASS@postplan.app/api/yookassa/webhook
+ * Then set WEBHOOK_BASIC_AUTH=USER:PASS in .env.
+ */
+export function verifyWebhookAuth(authorizationHeader: string | null): boolean {
+  const expected = process.env.YOOKASSA_WEBHOOK_BASIC_AUTH;
+  if (!expected) {
+    // If no auth configured, refuse — fail closed.
+    console.error('YOOKASSA_WEBHOOK_BASIC_AUTH not set — refusing webhook for safety');
+    return false;
+  }
+  if (!authorizationHeader) return false;
+
+  const expectedHeader = 'Basic ' + Buffer.from(expected).toString('base64');
+  // Constant-time compare to avoid timing leaks
+  if (authorizationHeader.length !== expectedHeader.length) return false;
+  let diff = 0;
+  for (let i = 0; i < authorizationHeader.length; i++) {
+    diff |= authorizationHeader.charCodeAt(i) ^ expectedHeader.charCodeAt(i);
+  }
+  return diff === 0;
+}

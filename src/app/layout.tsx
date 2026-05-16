@@ -5,23 +5,8 @@ import { Toaster } from 'sonner';
 import { cn } from '@/lib/utils';
 import './globals.css';
 
-// metadataBase needs a valid absolute URL. If NEXT_PUBLIC_APP_URL is missing
-// or malformed in a particular deploy, we don't want the WHOLE site to throw
-// "Invalid URL" on every render. Fall back gracefully.
-function getMetadataBase(): URL {
-  const raw = process.env.NEXT_PUBLIC_APP_URL;
-  if (raw) {
-    try {
-      return new URL(raw);
-    } catch {
-      // fallthrough — log nothing (server logs already have the value), use default
-    }
-  }
-  return new URL('https://postplan-tg.ru');
-}
-
 export const metadata: Metadata = {
-  metadataBase: getMetadataBase(),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://postplan.app'),
   title: {
     default: 'Постплан — планировщик постов для Telegram-каналов',
     template: '%s · Постплан',

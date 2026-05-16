@@ -7,14 +7,14 @@ import { Menu, X } from 'lucide-react';
 import { Logo } from '@/components/dashboard/logo';
 import { NavGroup } from '@/components/dashboard/sidebar';
 import {
-  PRIMARY_NAV, SECONDARY_NAV, FOOTER_NAV,
+  PRIMARY_NAV, SECONDARY_NAV, FOOTER_NAV, ADMIN_NAV,
 } from '@/components/dashboard/nav-config';
 
 /**
  * Mobile-only drawer trigger button + slide-in panel.
  * Shown only on screens smaller than `lg`.
  */
-export function MobileNavTrigger() {
+export function MobileNavTrigger({ isAdmin = false }: { isAdmin?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -91,6 +91,9 @@ export function MobileNavTrigger() {
         <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-3">
           <NavGroup items={PRIMARY_NAV} onItemClick={() => setOpen(false)} />
           <NavGroup items={SECONDARY_NAV} title="Управление" onItemClick={() => setOpen(false)} />
+          {isAdmin && (
+            <NavGroup items={ADMIN_NAV} title="Сервис" onItemClick={() => setOpen(false)} />
+          )}
         </nav>
 
         <div className="border-t border-border/60 p-3">

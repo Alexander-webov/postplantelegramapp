@@ -42,6 +42,26 @@ export interface Database {
         subscription_tier: SubscriptionTier;
         subscription_expires_at: string | null;
         yookassa_customer_id: string | null;
+        is_admin: boolean;
+        created_at: string;
+        updated_at: string;
+      }>;
+      blog_posts: Table<{
+        id: string;
+        slug: string;
+        title: string;
+        excerpt: string | null;
+        content_md: string;
+        cover_image_url: string | null;
+        meta_title: string | null;
+        meta_description: string | null;
+        og_image_url: string | null;
+        is_published: boolean;
+        published_at: string | null;
+        author_name: string | null;
+        author_id: string | null;
+        reading_minutes: number | null;
+        view_count: number;
         created_at: string;
         updated_at: string;
       }>;
