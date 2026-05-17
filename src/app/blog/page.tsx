@@ -25,10 +25,13 @@ export const metadata: Metadata = {
   },
 };
 
-// ISR — revalidate the index every 5 minutes. Server actions also call
-// revalidatePath('/blog') on writes, so updates appear sooner when admins
-// publish content.
-export const revalidate = 300;
+// We render this page on every request rather than prerender it at build
+// time. Reason: the Supabase client needs NEXT_PUBLIC_SUPABASE_URL +
+// SUPABASE_SERVICE_ROLE_KEY, which Railway only injects at runtime, not
+// during `next build`. Static prerender would crash with "Supabase URL
+// and Key required". `force-dynamic` keeps the page server-rendered;
+// caching (if needed later) can be added via `unstable_cache` per query.
+export const dynamic = 'force-dynamic';
 
 export default async function BlogIndexPage() {
   const supabase = createServiceClient();

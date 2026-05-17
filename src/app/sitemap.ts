@@ -12,7 +12,7 @@ import { createServiceClient } from '@/lib/supabase/server';
  * they're not useful for search engines and the canonical entry is /signup.
  */
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic';
 
 const BASE = 'https://postplan-tg.ru';
 

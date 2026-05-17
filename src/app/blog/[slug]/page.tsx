@@ -14,7 +14,9 @@ import { Logo } from '@/components/dashboard/logo';
 // URL + OG tags from the post's stored meta fields with sensible fallbacks.
 // =============================================================================
 
-export const revalidate = 300;
+// See /blog/page.tsx — Supabase env isn't available at build time on
+// Railway, so we skip static prerendering and render per-request.
+export const dynamic = 'force-dynamic';
 
 type PageProps = { params: { slug: string } };
 
