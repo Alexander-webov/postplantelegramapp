@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Radio, Send, Clock, FileText,
-  BarChart3, Settings, CreditCard, Briefcase, Shield,
+  BarChart3, Settings, CreditCard, Briefcase, Shield, Repeat,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -14,6 +14,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { href: '/dashboard', label: 'Обзор', icon: LayoutDashboard },
   { href: '/dashboard/posts/new', label: 'Создать пост', icon: Send },
   { href: '/dashboard/queue', label: 'Очередь', icon: Clock },
+  { href: '/dashboard/crosspromo', label: 'Взаимопиар', icon: Repeat },
 ];
 
 export const SECONDARY_NAV: NavItem[] = [

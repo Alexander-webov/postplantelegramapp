@@ -167,6 +167,43 @@ export function checkCrosspostLimit(
 }
 
 /**
+ * Check whether the user can start one more crosspromo (взаимопиар) deal this week.
+ * Counts deals from the cp_weekly_usage view (initiator + partner sides combined,
+ * excluding declined/cancelled). This is the paid-tier growth lever.
+ */
+export async function checkCrosspromoLimit(
+  userId: string,
+  tier: SubscriptionTier
+): Promise<LimitCheckResult> {
+  const limits = getTierLimits(tier);
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('cp_weekly_usage')
+    .select('deals_this_week')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const used = data?.deals_this_week ?? 0;
+
+  if (isUnlimited(limits.maxCrosspromoSlotsPerWeek)) {
+    return { allowed: true, reason: null, current: used, limit: limits.maxCrosspromoSlotsPerWeek };
+  }
+  if (used >= limits.maxCrosspromoSlotsPerWeek) {
+    return {
+      allowed: false,
+      reason:
+        tier === 'free'
+          ? `На Free доступна ${limits.maxCrosspromoSlotsPerWeek} сделка взаимопиара в неделю. Перейди на «Базовый» (299₽) — 5 в неделю, или «Профи» (690₽) — без лимита.`
+          : `Лимит взаимопиара на неделю исчерпан (${used}/${limits.maxCrosspromoSlotsPerWeek}). Лимит сбросится в понедельник, или перейди на «Профи» (690₽) — без лимита.`,
+      current: used,
+      limit: limits.maxCrosspromoSlotsPerWeek,
+    };
+  }
+  return { allowed: true, reason: null, current: used, limit: limits.maxCrosspromoSlotsPerWeek };
+}
+
+/**
  * Check whether the user's subscription has expired and they need to be downgraded to free.
  * Called lazily — on /dashboard load. We don't run a separate cron for this.
  */

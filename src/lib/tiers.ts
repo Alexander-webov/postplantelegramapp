@@ -19,6 +19,8 @@ export interface TierLimits {
   maxCrosspostChannels: number;
   /** 0 = no templates, ∞ = unlimited */
   maxTemplates: number;
+  /** Crosspromo (взаимопиар) deals allowed per ISO week. This is the growth lever. */
+  maxCrosspromoSlotsPerWeek: number;
 }
 
 const INFINITY = Number.POSITIVE_INFINITY;
@@ -40,6 +42,7 @@ export const TIERS: Record<SubscriptionTier, {
       maxPostsPerMonth: 10,
       maxCrosspostChannels: 1,
       maxTemplates: 0,
+      maxCrosspromoSlotsPerWeek: 1,
     },
   },
   start: {
@@ -51,6 +54,7 @@ export const TIERS: Record<SubscriptionTier, {
       maxPostsPerMonth: INFINITY,
       maxCrosspostChannels: 3,
       maxTemplates: INFINITY,
+      maxCrosspromoSlotsPerWeek: 5,
     },
   },
   pro: {
@@ -62,6 +66,7 @@ export const TIERS: Record<SubscriptionTier, {
       maxPostsPerMonth: INFINITY,
       maxCrosspostChannels: 50,
       maxTemplates: INFINITY,
+      maxCrosspromoSlotsPerWeek: INFINITY,
     },
   },
 };

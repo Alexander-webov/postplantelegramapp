@@ -199,3 +199,54 @@ export const placementAttachmentSchema = z.object({
   status: placementStatusSchema.optional().default('draft'),
 });
 export type PlacementAttachment = z.infer<typeof placementAttachmentSchema>;
+
+// ---- Crosspromo (взаимопиар) ----
+import { CP_TOPICS } from '@/lib/crosspromo/topics';
+
+export const cpTopicSchema = z.enum(CP_TOPICS);
+
+// Create / update a channel's listing in the crosspromo exchange
+export const upsertCpListingSchema = z.object({
+  channel_id: z.string().uuid('Выберите канал'),
+  topic: cpTopicSchema,
+  weekly_slots: z.coerce.number().int().min(1, 'Минимум 1').max(50, 'Максимум 50').default(3),
+  min_partner_reach_pct: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .max(100, 'Не больше 100%')
+    .default(50),
+  description: z.string().trim().max(500, 'Максимум 500 символов').optional().or(z.literal('')),
+});
+export type UpsertCpListingInput = z.infer<typeof upsertCpListingSchema>;
+
+// Propose a crosspromo deal to a partner listing
+export const proposeCpDealSchema = z.object({
+  my_listing_id: z.string().uuid(),
+  partner_listing_id: z.string().uuid(),
+  // when both sides will publish (ISO datetime-local from the form)
+  publish_at: z.string().min(1, 'Укажите дату публикации'),
+  min_hold_hours: z.coerce.number().int().min(1).max(168).default(24),
+  // text the initiator will publish (promotes the partner channel)
+  promo_text_for_partner: z
+    .string()
+    .trim()
+    .min(1, 'Напишите текст для поста')
+    .max(2000, 'Максимум 2000 символов'),
+});
+export type ProposeCpDealInput = z.infer<typeof proposeCpDealSchema>;
+
+// Partner accepts a deal — they supply the text THEY will publish (promotes initiator)
+export const acceptCpDealSchema = z.object({
+  deal_id: z.string().uuid(),
+  promo_text_for_initiator: z
+    .string()
+    .trim()
+    .min(1, 'Напишите текст для поста')
+    .max(2000, 'Максимум 2000 символов'),
+});
+export type AcceptCpDealInput = z.infer<typeof acceptCpDealSchema>;
+
+export const cpDealIdSchema = z.object({
+  deal_id: z.string().uuid(),
+});
