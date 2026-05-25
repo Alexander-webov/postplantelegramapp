@@ -3,7 +3,6 @@ import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import { Toaster } from 'sonner';
 import { cn } from '@/lib/utils';
-import { YandexMetrika } from '@/components/analytics/yandex-metrika';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -60,7 +59,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }}
       >
         {children}
-        <YandexMetrika />
         <Toaster
           position="bottom-right"
           toastOptions={{
