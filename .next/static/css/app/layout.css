@@ -847,6 +847,12 @@ video {
 .z-50 {
   z-index: 50;
 }
+.z-\[999\] {
+  z-index: 999;
+}
+.z-\[998\] {
+  z-index: 998;
+}
 .-m-1\.5 {
   margin: -0.375rem;
 }
@@ -1092,6 +1098,12 @@ video {
 .h-px {
   height: 1px;
 }
+.h-screen {
+  height: 100vh;
+}
+.h-\[100dvh\] {
+  height: 100dvh;
+}
 .max-h-60 {
   max-height: 15rem;
 }
@@ -1109,6 +1121,9 @@ video {
 }
 .min-h-screen {
   min-height: 100vh;
+}
+.min-h-0 {
+  min-height: 0px;
 }
 .w-1 {
   width: 0.25rem;
@@ -1183,6 +1198,9 @@ video {
 .w-full {
   width: 100%;
 }
+.w-\[320px\] {
+  width: 320px;
+}
 .min-w-0 {
   min-width: 0px;
 }
@@ -1230,6 +1248,9 @@ video {
 }
 .max-w-xl {
   max-width: 36rem;
+}
+.max-w-\[88vw\] {
+  max-width: 88vw;
 }
 .flex-1 {
   flex: 1 1 0%;
@@ -1487,6 +1508,9 @@ video {
 }
 .overflow-y-auto {
   overflow-y: auto;
+}
+.overscroll-contain {
+  overscroll-behavior: contain;
 }
 .truncate {
   overflow: hidden;
@@ -1861,6 +1885,9 @@ video {
 .bg-white\/95 {
   background-color: rgb(255 255 255 / 0.95);
 }
+.bg-black\/45 {
+  background-color: rgb(0 0 0 / 0.45);
+}
 .bg-\[radial-gradient\(circle_at_8\%_0\%\2c rgba\(79\2c 70\2c 229\2c 0\.12\)\2c transparent_34\%\)\2c radial-gradient\(circle_at_95\%_10\%\2c rgba\(14\2c 165\2c 233\2c 0\.12\)\2c transparent_30\%\)\] {
   background-image: radial-gradient(circle at 8% 0%,rgba(79,70,229,0.12),transparent 34%),radial-gradient(circle at 95% 10%,rgba(14,165,233,0.12),transparent 30%);
 }
@@ -2113,6 +2140,12 @@ video {
 }
 .pt-6 {
   padding-top: 1.5rem;
+}
+.pb-\[env\(safe-area-inset-bottom\)\] {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-\[env\(safe-area-inset-top\)\] {
+  padding-top: env(safe-area-inset-top);
 }
 .text-left {
   text-align: left;
@@ -2490,6 +2523,11 @@ video {
   --tw-shadow-colored: var(--shadow-xs);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
+.shadow-2xl {
+  --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
 .outline {
   outline-style: solid;
 }
@@ -2546,6 +2584,9 @@ video {
 }
 .duration-slow {
   transition-duration: var(--duration-slow);
+}
+.duration-300 {
+  transition-duration: 300ms;
 }
 .ease-out {
   transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
