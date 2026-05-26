@@ -380,6 +380,18 @@ export async function sendQuickPostAction(formData: FormData): Promise<ActionRes
     await supabase.from('posts').update({ status: 'failed' }).eq('id', post.id);
   }
 
+  // Publish-now sends to every channel in this one pass (no queued sends remain),
+  // so once at least one channel succeeded the originals are redundant — Telegram
+  // hosts the media now. Drop them from Storage to keep the bucket from growing.
+  if (sentCount > 0 && mediaPaths.length > 0) {
+    const { error: rmErr } = await supabase.storage.from('post-media').remove(mediaPaths);
+    if (rmErr) {
+      console.error('Storage cleanup failed for post', post.id, rmErr);
+    } else {
+      await supabase.from('post_media').update({ storage_deleted: true }).eq('post_id', post.id);
+    }
+  }
+
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/posts/new');
   revalidatePath('/dashboard/queue');

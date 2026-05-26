@@ -127,6 +127,8 @@ export interface Database {
         height: number | null;
         duration_seconds: number | null;
         file_size_bytes: number | null;
+        tg_file_ids: Record<string, string>;
+        storage_deleted: boolean;
         created_at: string;
       }>;
       'post-media': AnyTable;
