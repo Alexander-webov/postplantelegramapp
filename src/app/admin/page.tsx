@@ -11,9 +11,29 @@ export const dynamic = 'force-dynamic';
  * and the page is already gated by requireAdmin() in layout.
  */
 export default async function AdminHomePage() {
-  const supabase = createServiceClient();
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Collects any errors so the page can SURFACE them instead of silently
+  // rendering zeros. The most common production cause of "all zeros" is a
+  // missing/invalid SUPABASE_SERVICE_ROLE_KEY — these aggregates bypass RLS
+  // via the service-role client, and without a valid key every query errors.
+  const diagnostics: string[] = [];
+
+  // Guard: detect a missing service key explicitly (clearest possible message).
+  const hasServiceKey = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  if (!hasServiceKey) {
+    diagnostics.push(
+      'Переменная окружения SUPABASE_SERVICE_ROLE_KEY не задана на сервере. ' +
+        'Добавьте её в настройках окружения (Railway → Variables) и перезапустите деплой.'
+    );
+  }
+  if (!hasSupabaseUrl) {
+    diagnostics.push('Переменная окружения NEXT_PUBLIC_SUPABASE_URL не задана на сервере.');
+  }
+
+  const supabase = createServiceClient();
 
   // Parallel reads — small queries, but no reason to serialize
   const [
@@ -44,6 +64,17 @@ export default async function AdminHomePage() {
       .gte('created_at', thirtyDaysAgo),
   ]);
 
+  // Surface the first error from each query (deduplicated) so the real cause
+  // is visible on the page rather than swallowed into a zero.
+  const queryErrors = [
+    totalUsers.error, newUsers30d.error, paidUsers.error, freeUsers.error,
+    startUsers.error, proUsers.error, totalChannels.error, totalPosts.error,
+    publishedPosts.error, paidPayments30d.error,
+  ].filter(Boolean) as { message: string }[];
+  for (const msg of new Set(queryErrors.map((e) => e.message))) {
+    diagnostics.push(`Ошибка запроса к базе: ${msg}`);
+  }
+
   const revenue30d =
     (paidPayments30d.data ?? []).reduce((sum, p) => sum + Number(p.amount_rub ?? 0), 0);
 
@@ -66,6 +97,20 @@ export default async function AdminHomePage() {
         <h1 className="text-3xl font-semibold tracking-tight">Метрики</h1>
         <p className="mt-1 text-sm text-muted-foreground">Состояние сервиса на {now.toLocaleString('ru-RU')}.</p>
       </header>
+
+      {diagnostics.length > 0 && (
+        <section className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-semibold">Данные не загрузились — причина:</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            {diagnostics.map((d, i) => (
+              <li key={i}>{d}</li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-red-700">
+            Этот блок виден только администратору и исчезнет, как только запросы начнут проходить.
+          </p>
+        </section>
+      )}
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {metrics.map((m) => (
