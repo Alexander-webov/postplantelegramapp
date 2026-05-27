@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { addChannelAction } from '@/app/actions/channels';
+import { trackGoal } from '@/components/analytics/track-goal';
 
 interface BotOption {
   id: string;
@@ -35,6 +36,7 @@ export function AddChannelForm({ bots, defaultBotId }: AddChannelFormProps) {
             setError(result.error);
             toast.error(result.error);
           } else if (result.channel_id) {
+            trackGoal('channel_connected');
             toast.success(`Канал «${result.channel_title}» подключён`);
             router.push('/dashboard/channels');
           }

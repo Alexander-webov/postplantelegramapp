@@ -4,6 +4,7 @@ import { useTransition } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { createPaymentAction } from '@/app/actions/billing';
+import { trackGoal } from '@/components/analytics/track-goal';
 import type { SubscriptionTier } from '@/lib/tiers';
 
 interface Props {
@@ -21,6 +22,7 @@ export function UpgradeButton({ tier, priceRub, tierName }: Props) {
   const [pending, startTransition] = useTransition();
 
   function handleClick() {
+    trackGoal('checkout_start', { tier });
     startTransition(async () => {
       const result = await createPaymentAction(tier);
 

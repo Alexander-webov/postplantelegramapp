@@ -275,6 +275,30 @@
         "app/(dashboard)/dashboard/posts/new/page": "action-browser",
         "app/(dashboard)/dashboard/advertisers/[id]/page": "action-browser"
       }
+    },
+    "253f056b7932235909b31374283003f1b05d8494": {
+      "workers": {
+        "app/admin/posts/new/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5CAdmin%5C%5CDesktop%5C%5CMyProjects%5C%5Cpostplan-new%5C%5Csrc%5C%5Capp%5C%5Cactions%5C%5Cblog.ts%22%2C%5B%22updateBlogPostAction%22%2C%22deleteBlogPostAction%22%2C%22createBlogPostAction%22%5D%5D%5D&__client_imported__=true!"
+      },
+      "layer": {
+        "app/admin/posts/new/page": "action-browser"
+      }
+    },
+    "411cf658a7580b534da5fa3cbcde7ff89819f103": {
+      "workers": {
+        "app/admin/posts/new/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5CAdmin%5C%5CDesktop%5C%5CMyProjects%5C%5Cpostplan-new%5C%5Csrc%5C%5Capp%5C%5Cactions%5C%5Cblog.ts%22%2C%5B%22updateBlogPostAction%22%2C%22deleteBlogPostAction%22%2C%22createBlogPostAction%22%5D%5D%5D&__client_imported__=true!"
+      },
+      "layer": {
+        "app/admin/posts/new/page": "action-browser"
+      }
+    },
+    "f6b21c17eb89b4efc1c57b58f2e57d73d0e3b12d": {
+      "workers": {
+        "app/admin/posts/new/page": "(action-browser)/./node_modules/next/dist/build/webpack/loaders/next-flight-action-entry-loader.js?actions=%5B%5B%22C%3A%5C%5CUsers%5C%5CAdmin%5C%5CDesktop%5C%5CMyProjects%5C%5Cpostplan-new%5C%5Csrc%5C%5Capp%5C%5Cactions%5C%5Cblog.ts%22%2C%5B%22updateBlogPostAction%22%2C%22deleteBlogPostAction%22%2C%22createBlogPostAction%22%5D%5D%5D&__client_imported__=true!"
+      },
+      "layer": {
+        "app/admin/posts/new/page": "action-browser"
+      }
     }
   },
   "edge": {},

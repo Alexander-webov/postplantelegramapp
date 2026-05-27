@@ -11,6 +11,7 @@ import {
   revokeReportLinkAction,
   updatePlacementStatusAction,
 } from '@/app/actions/advertisers';
+import { trackGoal } from '@/components/analytics/track-goal';
 
 interface Props {
   placementId: string;
@@ -47,6 +48,7 @@ export function ReportLinkButton({
       } else if (r.slug) {
         setSlug(r.slug);
         setShowActions(true);
+        trackGoal('report_created');
         toast.success('Ссылка готова');
       }
     });

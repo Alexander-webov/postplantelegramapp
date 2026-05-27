@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { signupAction } from '@/app/actions/auth';
+import { trackGoal } from '@/components/analytics/track-goal';
 
 export function SignupForm() {
   const [pending, startTransition] = useTransition();
@@ -55,6 +56,7 @@ export function SignupForm() {
 
           if (result.success) {
             const message = result.message ?? 'Аккаунт создан. Проверь email для подтверждения.';
+            trackGoal('signup_success');
             setSuccessMessage(message);
             toast.success('Письмо отправлено');
           }
