@@ -145,3 +145,69 @@ export function formatScheduledPreview(
   const browserShort = browserTz.split('/').pop() ?? browserTz;
   return `Опубликуется ${inSelected} (= ${inBrowser} в твоей таймзоне ${browserShort})`;
 }
+
+/* ---------------------------------------------------------------------------
+ * Wall-clock arithmetic for bulk scheduling.
+ *
+ * These operate PURELY on the "YYYY-MM-DDTHH:mm" wall string and never go
+ * through a browser-local Date, so they introduce zero timezone drift. We use
+ * Date.UTC + getUTC* only as a calendar calculator (symmetric in/out).
+ * ------------------------------------------------------------------------- */
+
+interface WallParts { y: number; mo: number; d: number; h: number; mi: number; }
+
+function parseWall(wall: string): WallParts | null {
+  const m = wall.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  return { y: +m[1], mo: +m[2], d: +m[3], h: +m[4], mi: +m[5] };
+}
+
+function fmtWall(y: number, mo: number, d: number, h: number, mi: number): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${y}-${p(mo)}-${p(d)}T${p(h)}:${p(mi)}`;
+}
+
+/** Add minutes to a wall string, rolling days/months/years correctly. */
+export function addMinutesToWall(wall: string, mins: number): string {
+  const w = parseWall(wall);
+  if (!w) return wall;
+  const t = Date.UTC(w.y, w.mo - 1, w.d, w.h, w.mi) + mins * 60_000;
+  const dt = new Date(t);
+  return fmtWall(
+    dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate(),
+    dt.getUTCHours(), dt.getUTCMinutes()
+  );
+}
+
+/** Parse "09:30, 19:30" (or newline/space separated) into sorted minute offsets. */
+export function parseDaySlots(raw: string): number[] {
+  const slots = (raw.match(/\d{1,2}:\d{2}/g) ?? [])
+    .map((s) => {
+      const [h, mi] = s.split(':').map(Number);
+      return h * 60 + mi;
+    })
+    .filter((m) => m >= 0 && m < 24 * 60);
+  return Array.from(new Set(slots)).sort((a, b) => a - b);
+}
+
+/**
+ * Given the just-used wall time, return the next daily slot:
+ *  - the earliest slot LATER today, or
+ *  - the earliest slot on the next day if none remain today.
+ * Falls back to +1 day same time if slots are empty/invalid.
+ */
+export function nextSlotWall(wall: string, slotMins: number[]): string {
+  const w = parseWall(wall);
+  if (!w || slotMins.length === 0) return addMinutesToWall(wall, 24 * 60);
+  const cur = w.h * 60 + w.mi;
+  const later = slotMins.find((s) => s > cur);
+  if (later != null) {
+    return fmtWall(w.y, w.mo, w.d, Math.floor(later / 60), later % 60);
+  }
+  // Next day, first slot. Compute next-day date via a noon anchor (DST-safe here
+  // since we're doing pure calendar math in UTC).
+  const nextDay = addMinutesToWall(fmtWall(w.y, w.mo, w.d, 12, 0), 24 * 60);
+  const nd = parseWall(nextDay)!;
+  const first = slotMins[0];
+  return fmtWall(nd.y, nd.mo, nd.d, Math.floor(first / 60), first % 60);
+}

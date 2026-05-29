@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   Send, Calendar, ExternalLink, Globe, FileText, Hash, Signature,
-  Sparkles, Lock, Trash2,
+  Sparkles, Lock, Trash2, Link2, Repeat,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,7 @@ import { getTierLimits, isUnlimited, type SubscriptionTier } from '@/lib/tiers';
 import {
   TIMEZONES, detectBrowserTimezone, formatForDatetimeLocal,
   formatScheduledPreview, wallTimeToUTC,
+  addMinutesToWall, parseDaySlots, nextSlotWall,
 } from '@/lib/timezones';
 import { cn } from '@/lib/utils';
 
@@ -81,6 +82,55 @@ export function QuickPostForm({
   const [selectedTz, setSelectedTz] = useState('Europe/Moscow');
   const [scheduledWall, setScheduledWall] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // --- Link insertion popover ---
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('https://');
+  const [linkLabel, setLinkLabel] = useState('');
+  const selRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
+
+  // --- After-queue advance behaviour (bulk scheduling) ---
+  type AdvanceMode = 'day' | 'slots' | 'hour' | 'none';
+  const [advanceMode, setAdvanceMode] = useState<AdvanceMode>('day');
+  const [daySlotsRaw, setDaySlotsRaw] = useState('09:30, 19:30');
+
+  function openLinkEditor() {
+    const ta = textareaRef.current;
+    if (ta) {
+      selRef.current = { start: ta.selectionStart, end: ta.selectionEnd };
+      const sel = text.slice(ta.selectionStart, ta.selectionEnd);
+      setLinkLabel(sel);
+    } else {
+      selRef.current = { start: text.length, end: text.length };
+      setLinkLabel('');
+    }
+    setLinkUrl('https://');
+    setLinkOpen(true);
+  }
+
+  function applyLink() {
+    const url = linkUrl.trim();
+    const label = (linkLabel.trim() || url).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if (!url || url === 'https://') {
+      toast.error('Введите ссылку');
+      return;
+    }
+    const safeUrl = url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    const anchor = `<a href="${safeUrl}">${label}</a>`;
+    const { start, end } = selRef.current;
+    const next = text.slice(0, start) + anchor + text.slice(end);
+    setText(next);
+    setLinkOpen(false);
+    // Restore focus after React re-renders.
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        const pos = start + anchor.length;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      }
+    });
+  }
 
   useEffect(() => {
     const detected = detectBrowserTimezone();
@@ -169,12 +219,16 @@ export function QuickPostForm({
               );
               setText('');
               setMedia([]);
-              if (scheduledWall) {
-                const d = new Date(scheduledWall);
-                if (!Number.isNaN(d.getTime())) {
-                  d.setHours(d.getHours() + 1);
-                  setScheduledWall(formatForDatetimeLocal(d, selectedTz));
+              if (scheduledWall && advanceMode !== 'none') {
+                let nextWall = scheduledWall;
+                if (advanceMode === 'day') {
+                  nextWall = addMinutesToWall(scheduledWall, 24 * 60);
+                } else if (advanceMode === 'hour') {
+                  nextWall = addMinutesToWall(scheduledWall, 60);
+                } else if (advanceMode === 'slots') {
+                  nextWall = nextSlotWall(scheduledWall, parseDaySlots(daySlotsRaw));
                 }
+                setScheduledWall(nextWall);
               }
             }
           }
@@ -273,6 +327,15 @@ export function QuickPostForm({
               {media.length > 0 ? 'Подпись к медиа' : 'Текст поста'}
             </Label>
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={openLinkEditor}
+                className="inline-flex items-center gap-1 rounded-sm border border-border px-2 py-1 text-xs text-muted-foreground transition-base hover:bg-accent hover:text-foreground"
+                title="Вставить ссылку в выделенное слово"
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                Ссылка
+              </button>
               <EmojiPicker targetRef={textareaRef} onInsert={(v) => setText(v)} />
               <span
                 className={cn(
@@ -298,6 +361,41 @@ export function QuickPostForm({
             }
             className="font-sans text-[15px] leading-relaxed"
           />
+
+          {linkOpen && (
+            <div className="space-y-2 rounded-sm border border-primary/30 bg-primary-soft/30 p-3 animate-fade-up">
+              <div className="flex items-center gap-1.5 text-xs font-medium">
+                <Link2 className="h-3.5 w-3.5 text-primary" />
+                Вставить ссылку
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="link_label" className="text-xs">Текст ссылки</Label>
+                <Input
+                  id="link_label"
+                  value={linkLabel}
+                  onChange={(e) => setLinkLabel(e.target.value)}
+                  placeholder="Например: Find girl tonight"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="link_url" className="text-xs">URL</Label>
+                <Input
+                  id="link_url"
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://…"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyLink(); } }}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={applyLink}>Вставить</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setLinkOpen(false)}>Отмена</Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Выдели слово в тексте перед нажатием «Ссылка» — оно подставится автоматически.
+              </p>
+            </div>
+          )}
 
           <details className="group">
             <summary className="inline-flex cursor-pointer items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
@@ -443,6 +541,33 @@ export function QuickPostForm({
                 {previewText}
               </div>
             )}
+            <div className="space-y-2 border-t border-border pt-3">
+              <Label className="flex items-center gap-1.5 text-xs">
+                <Repeat className="h-3 w-3" />
+                Следующий пост после постановки
+              </Label>
+              <Select value={advanceMode} onChange={(e) => setAdvanceMode(e.target.value as AdvanceMode)}>
+                <option value="day">+1 день, то же время</option>
+                <option value="slots">По слотам в день (утро/вечер)</option>
+                <option value="hour">+1 час</option>
+                <option value="none">Не сдвигать</option>
+              </Select>
+              {advanceMode === 'slots' && (
+                <Input
+                  value={daySlotsRaw}
+                  onChange={(e) => setDaySlotsRaw(e.target.value)}
+                  placeholder="09:30, 19:30"
+                  className="text-sm"
+                />
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                {advanceMode === 'day' && 'Поставил пост — дата сама прыгнет на завтра в то же время. Пиши следующий и снова в очередь.'}
+                {advanceMode === 'slots' && 'Время будет переключаться между слотами, а после последнего — переходить на следующий день.'}
+                {advanceMode === 'hour' && 'Каждый следующий пост — на час позже.'}
+                {advanceMode === 'none' && 'Дата останется прежней — выставишь вручную.'}
+              </p>
+            </div>
+
             <p className="text-[11px] text-muted-foreground">
               До 3 месяцев вперёд. В БД хранится UTC, в очереди показываем в твоём часовом поясе.
             </p>
