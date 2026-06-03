@@ -100,45 +100,47 @@ export default async function QueuePage({ searchParams }: QueuePageProps) {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { data: rows, error: queueErr } = await supabase
-    .from("scheduled_posts")
-    .select(
-      `
+  const selectColumns = `
       id, scheduled_at, status, sent_at, error_message, retry_count, telegram_message_id,
       auto_delete_after_hours, auto_delete_at, auto_deleted_at, auto_delete_error,
       views_latest, views_latest_at, views_1h, views_6h, views_24h, views_48h,
       posts!left (id, content, post_media (id, type)),
       channels!left (id, title, username),
       ad_placements!left (id, price_rub, format, status, report_slug, advertisers!left (id, name, telegram_username))
-      `,
-    )
-    .eq("user_id", user.id)
-    .order("scheduled_at", { ascending: false })
-    .limit(100);
+      `;
 
-  if (queueErr) {
-    console.error("Queue page query failed:", queueErr);
-  }
+  // Two separate queries so a dense future schedule can never push the soonest
+  // pending posts past a row limit:
+  //  - pending/processing: soonest first (natural queue order), generous cap
+  //  - history: most recent first
+  const [pendingRes, historyRes] = await Promise.all([
+    supabase
+      .from("scheduled_posts")
+      .select(selectColumns)
+      .eq("user_id", user.id)
+      .in("status", ["pending", "processing"])
+      .order("scheduled_at", { ascending: true })
+      .limit(1000),
+    supabase
+      .from("scheduled_posts")
+      .select(selectColumns)
+      .eq("user_id", user.id)
+      .in("status", ["sent", "failed", "cancelled"])
+      .order("scheduled_at", { ascending: false })
+      .limit(100),
+  ]);
 
-  const allRows = rows ?? [];
+  if (pendingRes.error) console.error("Queue pending query failed:", pendingRes.error);
+  if (historyRes.error) console.error("Queue history query failed:", historyRes.error);
 
-  const queue = selectedDate
-    ? allRows.filter((r) => {
-        const dateSource = r.scheduled_at ?? r.sent_at;
-        return dateSource
-          ? toDateKey(new Date(dateSource)) === selectedDate
-          : false;
-      })
-    : allRows;
+  const dateFilter = (r: { scheduled_at: string | null; sent_at: string | null }) => {
+    if (!selectedDate) return true;
+    const dateSource = r.scheduled_at ?? r.sent_at;
+    return dateSource ? toDateKey(new Date(dateSource)) === selectedDate : false;
+  };
 
-  const pending = queue.filter(
-    (r) => r.status === "pending" || r.status === "processing",
-  );
-
-  const history = queue.filter(
-    (r) =>
-      r.status === "sent" || r.status === "failed" || r.status === "cancelled",
-  );
+  const pending = (pendingRes.data ?? []).filter(dateFilter);
+  const history = (historyRes.data ?? []).filter(dateFilter);
 
   return (
     <div className="space-y-6">

@@ -21,11 +21,6 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/layout.js"
     ],
-    "/(dashboard)/dashboard/queue/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/dashboard/queue/page.js"
-    ],
     "/(dashboard)/dashboard/posts/new/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",

@@ -19,6 +19,7 @@ import { EmojiPicker } from '@/components/dashboard/emoji-picker';
 import { MultiChannelSelect } from '@/components/dashboard/multi-channel-select';
 import { AutoDeleteSelect } from '@/components/dashboard/auto-delete-select';
 import { AdPlacementSection } from '@/components/dashboard/ad-placement-section';
+import { PostPreview } from '@/components/dashboard/post-preview';
 import type { AdvertiserOption } from '@/components/dashboard/advertiser-select';
 import { sendQuickPostAction, schedulePostAction } from '@/app/actions/posts';
 import { getTierLimits, isUnlimited, type SubscriptionTier } from '@/lib/tiers';
@@ -442,6 +443,16 @@ export function QuickPostForm({
           <Label>Медиа</Label>
           <MediaUploader value={media} onChange={setMedia} maxItems={10} />
         </div>
+
+        {/* Live preview */}
+        <PostPreview
+          text={text}
+          media={media}
+          signature={activeSignature && signatureOn ? activeSignature.content : null}
+          channelTitle={
+            channels.find((c) => c.id === selectedChannelIds[0])?.title
+          }
+        />
 
         {/* Submit area */}
         {error && (
